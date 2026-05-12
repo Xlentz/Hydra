@@ -13,11 +13,8 @@
         #game-canvas { background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50px 50px; }
         .tool-btn.active { background-color: #0891b2; border-color: #22d3ee; transform: scale(1.05); }
         .avatar-btn.selected { border-color: #22d3ee; background-color: rgba(34, 211, 238, 0.2); }
-        .achievement { filter: grayscale(100%); opacity: 0.5; }
-        .achievement.unlocked { filter: grayscale(0%); opacity: 1; }
         .star-icon { color: #475569; transition: color 0.3s; }
         .star-icon.filled { color: #eab308; filter: drop-shadow(0 0 5px rgba(234, 179, 8, 0.5)); }
-        
         ::-webkit-scrollbar { height: 6px; width: 6px; }
         ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.5); border-radius: 10px; }
@@ -100,7 +97,7 @@
             </div>
 
             <div class="flex gap-2">
-                <button id="btn-solution" class="p-4 bg-yellow-900/30 rounded-2xl border border-yellow-700/50 hover:bg-yellow-800/50 glass-effect" title="Lösung anzeigen">
+                <button id="btn-solution" class="p-4 bg-yellow-900/30 rounded-2xl border border-yellow-700/50 hover:bg-yellow-800/50 glass-effect" title="Tipp anzeigen">
                     <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a7 7 0 00-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 00-7-7zM9 21a1 1 0 001 1h4a1 1 0 001-1v-1H9v1z"></path></svg>
                 </button>
                 <button id="btn-reset" class="p-4 bg-slate-800 rounded-2xl border border-slate-700 hover:bg-slate-700 glass-effect" title="Neustart">
@@ -124,27 +121,6 @@
             
             <p id="win-xp" class="text-2xl text-cyan-300 mb-8 font-bold">+100 XP</p>
             <button id="btn-next" class="px-8 py-4 bg-cyan-600 rounded-xl font-bold text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-900/50 uppercase tracking-widest text-lg">Weiter</button>
-        </div>
-        
-        <div id="editor-overlay" class="absolute inset-0 z-40 bg-slate-900 hidden flex flex-col pointer-events-auto">
-            <header class="p-3 bg-slate-800 flex justify-between items-center shadow-lg">
-                <h2 class="text-lg font-bold text-cyan-400">Level Editor</h2>
-                <div class="flex gap-2">
-                    <button id="btn-editor-export" class="px-4 py-2 bg-emerald-600 rounded text-sm font-bold hover:bg-emerald-500">Export JSON</button>
-                    <button id="btn-editor-close" class="px-4 py-2 bg-slate-600 rounded text-sm font-bold hover:bg-slate-500">Schließen</button>
-                </div>
-            </header>
-            <div class="flex-1 relative overflow-hidden flex items-center justify-center bg-[#0f172a]">
-                <canvas id="editor-canvas" class="bg-slate-950"></canvas>
-            </div>
-            <div class="p-4 bg-slate-800 flex gap-2 overflow-x-auto border-t border-slate-700">
-                <button class="editor-tool p-2 bg-slate-700 rounded active" data-type="WALL">Wand</button>
-                <button class="editor-tool p-2 bg-slate-700 rounded" data-type="SOURCE" data-color="blue">Quelle (Blau)</button>
-                <button class="editor-tool p-2 bg-slate-700 rounded" data-type="TARGET" data-color="blue">Ziel (Blau)</button>
-                <button class="editor-tool p-2 bg-slate-700 rounded" data-type="SOURCE" data-color="yellow">Quelle (Gelb)</button>
-                <button class="editor-tool p-2 bg-slate-700 rounded" data-type="TARGET" data-color="yellow">Ziel (Gelb)</button>
-                <button class="editor-tool p-2 bg-slate-700 rounded" data-type="DELETE">Löschen</button>
-            </div>
         </div>
 
     </main>

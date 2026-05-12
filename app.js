@@ -58,7 +58,6 @@ class HydraGame {
         this.offsetX = 0; this.offsetY = 0;
         
         this.isFlowing = false;
-        this.usedSolution = false;
         this.clicks = 0;
         this.flowAnimationProgress = 0; 
         
@@ -66,7 +65,7 @@ class HydraGame {
         this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
-            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, unlockedLevels: 100, audio: true, colorblind: false // All unlocked
+            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
         };
         this.audio.enabled = this.playerStats.audio;
 
@@ -82,7 +81,6 @@ class HydraGame {
         this.resize();
         this.renderLevelList();
         this.setupEventListeners();
-        this.setupEditor();
         requestAnimationFrame(() => this.gameLoop());
         this.updateUI(); 
     }
@@ -163,9 +161,21 @@ class HydraGame {
         grid.innerHTML = '';
         HYDRA_LEVELS.forEach((level, index) => {
             const btn = document.createElement('button');
-            // FIX: Removed locked levels, everything is available for testing and playing
-            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all bg-slate-800 text-cyan-100 hover:bg-cyan-900 shadow-lg border border-cyan-500/50`;
-            btn.innerHTML = `<span class="text-xl">${level.id}</span>`;
+            
+            let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[level.id] || 0) : 0;
+            let starHtml = '';
+            if (stars > 0) {
+                starHtml = `<div class="flex mt-1">`;
+                for(let i=0; i<3; i++) {
+                    starHtml += `<svg class="w-3 h-3 ${i<stars ? 'text-yellow-400' : 'text-slate-600'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+                }
+                starHtml += `</div>`;
+            }
+            
+            let isCompleted = stars > 0;
+            
+            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all ${isCompleted ? 'bg-cyan-900 border-cyan-400' : 'bg-slate-800 border-slate-700 opacity-80'} hover:bg-cyan-800 shadow-lg border hover:scale-105`;
+            btn.innerHTML = `<span class="text-xl text-cyan-100">${level.id}</span>${starHtml}`;
             btn.onclick = () => this.startLevel(index);
             grid.appendChild(btn);
         });
@@ -176,7 +186,6 @@ class HydraGame {
         this.initialInventory = JSON.parse(JSON.stringify(this.currentLevel.inventory));
         
         this.isFlowing = false;
-        this.usedSolution = false;
         this.clicks = 0;
         this.flowAnimationProgress = 0;
         
@@ -280,8 +289,13 @@ class HydraGame {
             this.startLevel(this.currentLevel.id - 1);
         };
         
+        // FIX: The lightbulb now actually shows the hint!
         document.getElementById('btn-solution').onclick = () => {
-            this.showSolution();
+            if (this.currentLevel && this.currentLevel.hint) {
+                alert("Tipp: " + this.currentLevel.hint);
+            } else {
+                alert("Für diesen Sektor sind leider keine Tipps verfügbar.");
+            }
         };
         
         document.getElementById('btn-next').onclick = () => {
@@ -289,109 +303,6 @@ class HydraGame {
             if (this.currentLevel.id < HYDRA_LEVELS.length) this.startLevel(this.currentLevel.id);
             else location.reload();
         }
-    }
-    
-    setupEditor() {
-        const overlay = document.getElementById('editor-overlay');
-        const c = document.getElementById('editor-canvas');
-        const ctx = c.getContext('2d');
-        let edGrid = Array(7).fill().map(() => Array(7).fill(null));
-        let activeEdTool = 'WALL';
-        let edColor = 'blue';
-        let sources = []; let targets = [];
-        
-        document.getElementById('btn-editor').onclick = () => overlay.classList.remove('hidden');
-        document.getElementById('btn-editor-close').onclick = () => overlay.classList.add('hidden');
-        
-        document.querySelectorAll('.editor-tool').forEach(btn => {
-            btn.onclick = (e) => {
-                document.querySelectorAll('.editor-tool').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                activeEdTool = btn.dataset.type;
-                edColor = btn.dataset.color || 'blue';
-            }
-        });
-        
-        function drawEd() {
-            c.width = c.parentElement.clientWidth; c.height = c.parentElement.clientHeight;
-            const cs = 50; const ox = (c.width - 7*cs)/2; const oy = (c.height - 7*cs)/2;
-            ctx.clearRect(0,0,c.width,c.height);
-            ctx.strokeStyle = '#334155';
-            for(let i=0; i<=7; i++) {
-                ctx.beginPath(); ctx.moveTo(ox+i*cs, oy); ctx.lineTo(ox+i*cs, oy+7*cs); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(ox, oy+i*cs); ctx.lineTo(ox+7*cs, oy+i*cs); ctx.stroke();
-            }
-            
-            for(let r=0; r<7; r++) {
-                for(let c2=0; c2<7; c2++) {
-                    const cell = edGrid[r][c2];
-                    if(!cell) continue;
-                    if(cell === 'WALL') { ctx.fillStyle = '#1e293b'; ctx.fillRect(ox+c2*cs+2, oy+r*cs+2, cs-4, cs-4); }
-                }
-            }
-            
-            sources.forEach(s => { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(ox+s.x*cs+cs/2, oy+s.y*cs+cs/2, cs*0.3, 0, Math.PI*2); ctx.fill(); });
-            targets.forEach(t => { ctx.strokeStyle = t.requiredColor; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(ox+t.x*cs+cs/2, oy+t.y*cs+cs/2, cs*0.4, 0, Math.PI*2); ctx.stroke(); });
-            requestAnimationFrame(drawEd);
-        }
-        drawEd();
-        
-        c.addEventListener('pointerdown', (e) => {
-            const rect = c.getBoundingClientRect();
-            const cs = 50; const ox = (c.width - 7*cs)/2; const oy = (c.height - 7*cs)/2;
-            const col = Math.floor((e.clientX - rect.left - ox)/cs);
-            const row = Math.floor((e.clientY - rect.top - oy)/cs);
-            if(col>=0 && col<7 && row>=0 && row<7) {
-                if(activeEdTool === 'DELETE') {
-                    edGrid[row][col] = null;
-                    sources = sources.filter(s => s.x !== col || s.y !== row);
-                    targets = targets.filter(t => t.x !== col || t.y !== row);
-                } else if(activeEdTool === 'WALL') {
-                    edGrid[row][col] = 'WALL';
-                } else if(activeEdTool === 'SOURCE') {
-                    sources.push({x:col, y:row, color:edColor});
-                } else if(activeEdTool === 'TARGET') {
-                    targets.push({x:col, y:row, requiredColor:edColor});
-                }
-            }
-        });
-        
-        document.getElementById('btn-editor-export').onclick = () => {
-            let walls = [];
-            for(let r=0; r<7; r++) for(let c=0; c<7; c++) if(edGrid[r][c]==='WALL') walls.push({x:c,y:r});
-            const out = {
-                id: 999, title: "Custom Level", difficulty: "Custom", xpReward: 0,
-                gridSize: {cols:7, rows:7}, sources, targets, walls,
-                inventory: {pipes_straight:10, pipes_angle:10, pipes_cross:5, andGates:2, mixers:2, splitters:2, portals:2, valves:2},
-                parClicks: 10
-            };
-            alert("JSON in Console exportiert!");
-            console.log(JSON.stringify(out));
-        };
-    }
-    
-    showSolution() {
-        if (!this.currentLevel || !this.currentLevel.solution || this.currentLevel.solution.length === 0) return;
-        this.isFlowing = false;
-        
-        for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
-            for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
-                if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') this.grid[r][c] = null;
-            }
-        }
-        
-        this.currentLevel.solution.forEach(comp => {
-            if (this.grid[comp.y] && this.grid[comp.y][comp.x] === null) {
-                this.grid[comp.y][comp.x] = { type: comp.type, rotation: comp.rotation };
-            }
-        });
-        
-        const inv = this.currentLevel.inventory;
-        for(let k in inv) inv[k] = 0;
-        
-        this.usedSolution = true;
-        this.updateUI();
-        this.calculateFlow(true);
     }
 
     handleCellClick(x, y) {
@@ -418,7 +329,7 @@ class HydraGame {
                 if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
                     cell.rotation = (cell.rotation + 1) % 4;
                     this.audio.playClick();
-                    // FIX: No this.clicks++ for rotating anymore! Only placing tiles counts.
+                    // Rotating no longer penalizes clicks!
                 }
             } else {
                 let p = false;
@@ -505,19 +416,25 @@ class HydraGame {
             let node = queue.shift();
             let currentCell = this.grid[node.y][node.x];
             
+            // FIX: PORTAL LOGIC REWRITE
             if (currentCell && currentCell.type === 'PORTAL' && portals.length === 2) {
-                let other = portals.find(p => p.x !== node.x || p.y !== node.y);
-                if (other) {
-                    let otherCell = this.grid[other.y][other.x];
-                    if(!otherCell.flows['out']) {
-                        otherCell.flows['out'] = node.color;
-                        queue.push({x: other.x, y: other.y, color: node.color, fromDir: null});
+                // Wenn wir aus einem Rohr INS Portal kommen
+                if (node.fromDir !== 'portal') {
+                    let other = portals.find(p => p.x !== node.x || p.y !== node.y);
+                    if (other) {
+                        let otherCell = this.grid[other.y][other.x];
+                        if(!otherCell.flows['out']) {
+                            otherCell.flows['out'] = node.color; // Färbe das andere Portal
+                            // Setze das ANDERE Portal in die Queue, markiert als aus einem Portal kommend!
+                            queue.push({x: other.x, y: other.y, color: node.color, fromDir: 'portal'});
+                        }
                     }
-                    continue; 
+                    continue; // Breche hier ab, das EINGANGSPORTAL leitet nicht in angrenzende Rohre weiter
                 }
+                // Wenn fromDir === 'portal', lassen wir den Code ganz normal durchlaufen, 
+                // damit das Portal in angrenzende Rohre drückt!
             }
 
-            // FIX: Splitter Logic Rewrite. Evaluate available colors outside the loop
             let availableColors = null;
             if (node.color === 'split_trigger') {
                 availableColors = [...node.colors];
@@ -532,7 +449,7 @@ class HydraGame {
                 
                 let emitColor = node.color;
                 if (node.color === 'split_trigger') {
-                    if (availableColors.length === 0) return; // Out of colors to emit
+                    if (availableColors.length === 0) return; 
                     emitColor = availableColors[0];
                 }
 
@@ -648,16 +565,30 @@ class HydraGame {
             
             let par = this.currentLevel.parClicks || 10;
             let earnedStars = 1;
-            if(this.usedSolution) earnedStars = 0;
-            else if(this.clicks <= par) earnedStars = 3;
-            else if(this.clicks <= par * 1.5) earnedStars = 2;
+            
+            // FIX: Stars only depend on number of placed parts vs par value
+            if(this.clicks <= par) earnedStars = 3;
+            else if(this.clicks <= par + 2) earnedStars = 2;
 
-            const xp = this.usedSolution ? 0 : this.currentLevel.xpReward;
-            this.playerStats.xp += xp;
-            this.playerStats.stars += earnedStars;
-            if (this.currentLevel.id >= this.playerStats.unlockedLevels) {
-                this.playerStats.unlockedLevels = this.currentLevel.id + 1;
+            const xp = this.currentLevel.xpReward;
+            
+            // FIX: Store stars per level to display in UI later
+            if (!this.playerStats.levelStars) this.playerStats.levelStars = {};
+            let prevStars = this.playerStats.levelStars[this.currentLevel.id] || 0;
+            
+            if (earnedStars > prevStars) {
+                this.playerStats.stars += (earnedStars - prevStars); // Add only new stars
+                this.playerStats.levelStars[this.currentLevel.id] = earnedStars;
             }
+            
+            if (prevStars === 0) {
+                this.playerStats.xp += xp; // First time win
+            } else if (earnedStars > prevStars) {
+                this.playerStats.xp += Math.floor(xp * 0.5); // Better score reward
+            } else {
+                this.playerStats.xp += 10; // Participation reward
+            }
+            
             localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
             this.updateUI();
             
@@ -669,19 +600,11 @@ class HydraGame {
                 document.getElementById(`star-${num}`).classList.toggle('filled', num <= earnedStars);
             });
             
-            if (this.usedSolution) {
-                winTitle.textContent = "Level Übersprungen";
-                winTitle.className = "text-4xl font-bold text-slate-300 mb-2 drop-shadow-lg text-center";
-                winSub.textContent = "0 Sterne - Übe weiter!";
-                winXp.textContent = "0 XP";
-                winXp.className = "text-2xl text-slate-500 mb-8 font-bold";
-            } else {
-                winTitle.textContent = "Level Abgeschlossen!";
-                winTitle.className = "text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-2 drop-shadow-lg text-center";
-                winSub.textContent = `${this.clicks} Züge benötigt (Par: ${par})`;
-                winXp.textContent = `+${xp} XP`;
-                winXp.className = "text-2xl text-cyan-300 mb-8 font-bold";
-            }
+            winTitle.textContent = "Level Abgeschlossen!";
+            winTitle.className = "text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-2 drop-shadow-lg text-center";
+            winSub.textContent = `Du hast ${this.clicks} Bauteile verbaut (Optimal: ${par})`;
+            winXp.textContent = prevStars === 0 ? `+${xp} XP` : (earnedStars > prevStars ? `+${Math.floor(xp * 0.5)} XP` : '+10 XP');
+            winXp.className = "text-2xl text-cyan-300 mb-8 font-bold";
             
             document.getElementById('win-overlay').classList.remove('hidden');
             document.getElementById('game-controls').classList.add('hidden');
