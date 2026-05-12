@@ -266,7 +266,7 @@ class HydraGame {
 
         let queue = [];
         this.currentLevel.sources.forEach(s => {
-            queue.push({x: s.x, y: s.y, color: s.color, fromDir: -1, originX: s.x, originY: s.y});
+            queue.push({x: s.x, y: s.y, color: s.color, fromDir: null, originX: s.x, originY: s.y});
         });
 
         let iters = 0;
@@ -279,9 +279,9 @@ class HydraGame {
             let currentCell = this.grid[node.y][node.x];
 
             DIRS.forEach(move => {
-                if (move.d === (node.fromDir + 2) % 4) return; 
+                if (node.fromDir !== null && move.d === (node.fromDir + 2) % 4) return; 
 
-                if (currentCell && currentCell.type === 'PIPE_CROSS' && node.fromDir !== -1) {
+                if (currentCell && currentCell.type === 'PIPE_CROSS' && node.fromDir !== null) {
                     if (move.d !== node.fromDir) return; 
                 }
 
@@ -311,7 +311,7 @@ class HydraGame {
                             
                             if (cell.inputOrigins.size >= 2) {
                                 cell.flows['out'] = cell.inputs[0]; 
-                                queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: move.d, originX: nx, originY: ny});
+                                queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: null, originX: nx, originY: ny});
                             }
                         }
                         else if (cell.type === 'MIXER') {
@@ -321,7 +321,7 @@ class HydraGame {
                             if (cell.inputOrigins.size >= 2) {
                                 let mixed = this.mixColors(cell.inputs[0], cell.inputs[1]);
                                 cell.flows['out'] = mixed;
-                                queue.push({x: nx, y: ny, color: mixed, fromDir: move.d, originX: nx, originY: ny});
+                                queue.push({x: nx, y: ny, color: mixed, fromDir: null, originX: nx, originY: ny});
                             } else {
                                 cell.flows['out'] = cell.inputs[0];
                             }
@@ -398,12 +398,10 @@ class HydraGame {
         this.currentLevel.sources.forEach(source => {
             const x = source.x * s; const y = source.y * s;
 
-            // Connection Lines
-            this.ctx.fillStyle = "#475569";
-            this.ctx.fillRect(x + hw - 6, y, 12, s);
-            this.ctx.fillRect(x, y + hw - 6, s, 12);
-
             this.ctx.fillStyle = this.colorMap[source.color];
+            this.ctx.fillRect(x + hw - 4, y, 8, s);
+            this.ctx.fillRect(x, y + hw - 4, s, 8);
+
             this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[source.color];
             this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
             this.ctx.shadowBlur = 0; 
@@ -415,7 +413,6 @@ class HydraGame {
         this.currentLevel.targets.forEach(target => {
             const x = target.x * s; const y = target.y * s;
 
-            // Connection Lines
             this.ctx.fillStyle = "#475569";
             this.ctx.fillRect(x + hw - 6, y, 12, s);
             this.ctx.fillRect(x, y + hw - 6, s, 12);
@@ -460,7 +457,7 @@ class HydraGame {
                     this.ctx.rotate(cell.rotation * Math.PI / 2);
                 }
 
-                const pW = s * 0.3; // Pipe visual width
+                const pW = s * 0.3; 
                 const hPw = pW / 2;
                 
                 let wCol = null;
@@ -487,10 +484,10 @@ class HydraGame {
                     this.ctx.fillRect(-hPw, -hPw, hw + hPw, pW);
                     
                     this.ctx.fillStyle = "#94a3b8";
-                    this.ctx.fillRect(-hPw, -hw, 2, hw + hPw); // L top
-                    this.ctx.fillRect(-hPw, hPw - 2, hw + hPw, 2); // B right
-                    this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw + 2); // R top inner
-                    this.ctx.fillRect(hPw - 2, -hPw, hw - hPw + 2, 2); // T right inner
+                    this.ctx.fillRect(-hPw, -hw, 2, hw + hPw); 
+                    this.ctx.fillRect(-hPw, hPw - 2, hw + hPw, 2); 
+                    this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw + 2); 
+                    this.ctx.fillRect(hPw - 2, -hPw, hw - hPw + 2, 2); 
                     
                     if(wCol) { 
                         this.ctx.fillStyle = this.colorMap[wCol];
@@ -521,8 +518,8 @@ class HydraGame {
                 }
                 else if (cell.type === 'AND_GATE' || cell.type === 'MIXER') {
                     this.ctx.fillStyle = "#475569";
-                    this.ctx.fillRect(-6, -hw, 12, s); // V ports
-                    this.ctx.fillRect(-hw, -6, s, 12); // H ports
+                    this.ctx.fillRect(-6, -hw, 12, s); 
+                    this.ctx.fillRect(-hw, -6, s, 12); 
                     
                     if (cell.type === 'AND_GATE') {
                         this.ctx.fillStyle = "#1e293b";
