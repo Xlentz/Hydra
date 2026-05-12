@@ -29,7 +29,7 @@ class HydraGame {
         this.renderLevelList();
         this.setupEventListeners();
         requestAnimationFrame(() => this.gameLoop());
-        this.updateUI();
+        this.updateUI(); 
     }
 
     resize() {
@@ -45,26 +45,28 @@ class HydraGame {
         this.offsetY = (this.canvas.height - gridH) / 2 - 40; 
     }
 
+    // NULL CHECKS added to prevent silent JS crashes when UI elements change!
     updateUI() {
-        document.getElementById('player-name').textContent = this.playerStats.name;
-        document.getElementById('header-avatar').textContent = this.playerStats.avatar;
-        document.getElementById('player-xp').textContent = this.playerStats.xp;
-        document.getElementById('player-stars').textContent = this.playerStats.stars;
+        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        
+        setEl('player-name', this.playerStats.name);
+        setEl('header-avatar', this.playerStats.avatar);
+        setEl('player-xp', this.playerStats.xp);
+        setEl('player-stars', this.playerStats.stars);
         
         if (this.currentLevel) {
-            document.getElementById('inv-straight').textContent = this.currentLevel.inventory.pipes_straight;
-            document.getElementById('inv-angle').textContent = this.currentLevel.inventory.pipes_angle;
-            document.getElementById('inv-cross').textContent = this.currentLevel.inventory.pipes_cross;
-            document.getElementById('inv-and').textContent = this.currentLevel.inventory.andGates;
-            document.getElementById('inv-mix').textContent = this.currentLevel.inventory.mixers;
-            document.getElementById('header-level').textContent = this.currentLevel.id;
+            setEl('inv-straight', this.currentLevel.inventory.pipes_straight);
+            setEl('inv-angle', this.currentLevel.inventory.pipes_angle);
+            setEl('inv-cross', this.currentLevel.inventory.pipes_cross);
+            setEl('inv-and', this.currentLevel.inventory.andGates);
+            setEl('inv-mix', this.currentLevel.inventory.mixers);
+            setEl('header-level', this.currentLevel.id);
         }
 
-        // Update Achievements UI
         const unlocked = this.playerStats.unlockedLevels;
-        if(unlocked > 1) document.getElementById('ach-1').classList.add('unlocked');
-        if(unlocked > 3) document.getElementById('ach-3').classList.add('unlocked');
-        if(unlocked > 5) document.getElementById('ach-5').classList.add('unlocked');
+        const a1 = document.getElementById('ach-1'); if(a1 && unlocked > 1) a1.classList.add('unlocked');
+        const a3 = document.getElementById('ach-3'); if(a3 && unlocked > 3) a3.classList.add('unlocked');
+        const a5 = document.getElementById('ach-5'); if(a5 && unlocked > 5) a5.classList.add('unlocked');
     }
 
     renderLevelList() {
@@ -109,9 +111,14 @@ class HydraGame {
         let selectedAvatarTemp = this.playerStats.avatar;
 
         document.getElementById('btn-open-profile').onclick = () => {
-            document.getElementById('input-player-name').value = this.playerStats.name;
-            document.getElementById('modal-xp').textContent = this.playerStats.xp + ' XP';
-            document.getElementById('modal-stars').textContent = this.playerStats.stars;
+            const inp = document.getElementById('input-player-name');
+            if(inp) inp.value = this.playerStats.name;
+            
+            const mxp = document.getElementById('modal-xp');
+            if(mxp) mxp.textContent = this.playerStats.xp + ' XP';
+            
+            const mst = document.getElementById('modal-stars');
+            if(mst) mst.textContent = this.playerStats.stars;
             
             document.querySelectorAll('.avatar-btn').forEach(btn => {
                 btn.classList.toggle('selected', btn.dataset.avatar === this.playerStats.avatar);
@@ -121,7 +128,7 @@ class HydraGame {
                     selectedAvatarTemp = e.currentTarget.dataset.avatar;
                 };
             });
-            this.updateUI(); // ensure achievements show correctly
+            this.updateUI();
             modal.classList.remove('hidden');
         };
         
@@ -188,12 +195,10 @@ class HydraGame {
             }
         } else {
             if (cell) {
-                // Rotate if it's a pipe and NOT delete tool
-                if(['PIPE_STRAIGHT', 'PIPE_ANGLE'].includes(cell.type)) {
+                if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS'].includes(cell.type)) {
                     cell.rotation = (cell.rotation + 1) % 4;
                 }
             } else {
-                // Place new
                 let placed = false;
                 if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) {
                     this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: 0 }; inv.pipes_straight--; placed = true;
@@ -220,9 +225,6 @@ class HydraGame {
         return isST;
     }
 
-    // --- NEW STRICT LOGIC ENGINE ---
-    // Directions: 0=Top, 1=Right, 2=Bottom, 3=Left
-
     getPorts(cell) {
         if (!cell) return [];
         if (cell.type === 'PIPE_STRAIGHT') return cell.rotation % 2 === 0 ? [1, 3] : [0, 2];
@@ -238,11 +240,9 @@ class HydraGame {
     }
 
     canConnect(fromX, fromY, toX, toY, dir) {
-        // dir is direction FROM 'from' TO 'to'
         const fromCell = this.grid[fromY] && this.grid[fromY][fromX];
         const toCell = this.grid[toY] && this.grid[toY][toX];
         
-        // Sources connect out to anything
         let fromPorts = fromCell ? this.getPorts(fromCell) : [0,1,2,3]; 
         let toPorts = toCell ? this.getPorts(toCell) : [0,1,2,3];
 
@@ -256,7 +256,7 @@ class HydraGame {
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
                 if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') {
-                    this.grid[r][c].flows = {}; // e.g. { '0': 'blue', '2': 'red' } meaning flow towards Top is blue, Bottom is red
+                    this.grid[r][c].flows = {}; 
                     this.grid[r][c].inputs = [];
                     this.grid[r][c].inputOrigins = new Set();
                 }
@@ -267,7 +267,6 @@ class HydraGame {
 
         let queue = [];
         this.currentLevel.sources.forEach(s => {
-            // Source pushes to all 4 neighbors
             queue.push({x: s.x, y: s.y, color: s.color, fromDir: -1, originX: s.x, originY: s.y});
         });
 
@@ -278,37 +277,35 @@ class HydraGame {
             iters++;
             let node = queue.shift();
 
+            // BUGFIX for Cross Pipe logic: water inside a cross pipe can ONLY exit straight ahead.
+            let currentCell = this.grid[node.y][node.x];
+
             DIRS.forEach(move => {
-                // Don't flow backward
-                if (move.d === (node.fromDir + 2) % 4) return;
-                
+                if (move.d === (node.fromDir + 2) % 4) return; // Don't flow backward
+
+                if (currentCell && currentCell.type === 'PIPE_CROSS' && node.fromDir !== -1) {
+                    if (move.d !== node.fromDir) return; // STRICTLY Straight!
+                }
+
                 let nx = node.x + move.dx;
                 let ny = node.y + move.dy;
 
                 if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
-                    // Check if they visually connect
                     if (!this.canConnect(node.x, node.y, nx, ny, move.d)) return;
 
                     let target = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
                     if (target) {
                         target.currentFlow = node.color;
-                        return; // Reached target
+                        return; 
                     }
 
                     let cell = this.grid[ny][nx];
                     if (cell && cell.type !== 'WALL') {
-                        // Prevent infinite loop in the exact same pipe/dir
                         if(cell.flows[move.d] === node.color) return; 
                         
                         if (cell.type.startsWith('PIPE')) {
-                            cell.flows[move.d] = node.color; // store color flowing OUT to this dir
-                            // Special for CROSS: don't mix, go straight through
-                            if(cell.type === 'PIPE_CROSS') {
-                                queue.push({x: nx, y: ny, color: node.color, fromDir: move.d, originX: nx, originY: ny});
-                            } else {
-                                // Angle/Straight just propagate to all connected (which is usually just 1 other port)
-                                queue.push({x: nx, y: ny, color: node.color, fromDir: move.d, originX: nx, originY: ny});
-                            }
+                            cell.flows[move.d] = node.color; 
+                            queue.push({x: nx, y: ny, color: node.color, fromDir: move.d, originX: nx, originY: ny});
                         }
                         else if (cell.type === 'AND_GATE') {
                             cell.inputOrigins.add(move.d);
@@ -329,7 +326,6 @@ class HydraGame {
                                 queue.push({x: nx, y: ny, color: mixed, fromDir: move.d, originX: nx, originY: ny});
                             } else {
                                 cell.flows['out'] = cell.inputs[0];
-                                // Don't propagate until mixed
                             }
                         }
                     }
@@ -360,14 +356,16 @@ class HydraGame {
                 localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
                 this.updateUI();
                 
-                document.getElementById('win-xp').textContent = `+${xp} XP`;
-                document.getElementById('win-overlay').classList.remove('hidden');
-                document.getElementById('game-controls').classList.add('hidden');
+                const winXp = document.getElementById('win-xp');
+                if (winXp) winXp.textContent = `+${xp} XP`;
+                
+                const overlay = document.getElementById('win-overlay');
+                const controls = document.getElementById('game-controls');
+                if(overlay) overlay.classList.remove('hidden');
+                if(controls) controls.classList.add('hidden');
             }, 600);
         }
     }
-
-    // --- RENDERING ---
 
     gameLoop() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -415,7 +413,6 @@ class HydraGame {
                 this.ctx.save();
                 this.ctx.translate(x + hw, y + hw);
                 
-                // Rotation applying ONLY to pipes
                 if (cell.rotation !== undefined) {
                     this.ctx.rotate(cell.rotation * Math.PI / 2);
                 }
@@ -425,10 +422,7 @@ class HydraGame {
                 this.ctx.lineWidth = 2;
                 
                 let wCol = null;
-                // Get ANY flow color for visual fill if needed
-                if(cell.flows) {
-                    wCol = Object.values(cell.flows)[0];
-                }
+                if(cell.flows) { wCol = Object.values(cell.flows)[0]; }
 
                 const drawWater = (color) => {
                     if(!color) return;
@@ -441,12 +435,10 @@ class HydraGame {
                     if(wCol) { drawWater(wCol); this.ctx.fillRect(-s, -s*0.15, s*2, s*0.3); }
                 } 
                 else if (cell.type === 'PIPE_ANGLE') {
-                    // Top to Right (rot 0)
                     this.ctx.fillRect(-s*0.25, -s, s*0.5, s*1.25);
                     this.ctx.fillRect(-s*0.25, -s*0.25, s*1.25, s*0.5);
                     this.ctx.strokeRect(-s*0.25, -s, s*0.5, s*1.25);
                     this.ctx.strokeRect(-s*0.25, -s*0.25, s*1.25, s*0.5);
-                    // Hide intersection lines
                     this.ctx.fillRect(-s*0.22, -s*0.22, s*0.44, s*0.44);
                     
                     if(wCol) { 
@@ -462,9 +454,12 @@ class HydraGame {
                     this.ctx.strokeRect(-s, -s*0.25, s*2, s*0.5);
                     this.ctx.fillRect(-s*0.22, -s*0.22, s*0.44, s*0.44);
                     
-                    // Cross can have different colors crossing
-                    if(cell.flows && cell.flows[0]) { drawWater(cell.flows[0]); this.ctx.fillRect(-s*0.15, -s, s*0.3, s*2); }
-                    if(cell.flows && cell.flows[1]) { drawWater(cell.flows[1]); this.ctx.fillRect(-s, -s*0.15, s*2, s*0.3); }
+                    // BUGFIX for visual cross rendering!
+                    let flowV = (cell.flows && (cell.flows[0] || cell.flows[2]));
+                    let flowH = (cell.flows && (cell.flows[1] || cell.flows[3]));
+                    
+                    if(flowV) { drawWater(flowV); this.ctx.fillRect(-s*0.15, -s, s*0.3, s*2); }
+                    if(flowH) { drawWater(flowH); this.ctx.fillRect(-s, -s*0.15, s*2, s*0.3); }
                 }
                 else if (cell.type === 'AND_GATE') {
                     this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2);

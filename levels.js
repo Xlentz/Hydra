@@ -127,7 +127,7 @@ const HYDRA_LEVELS = [
     },
     {
         "id": 4,
-        "title": "Getrennte Wege (Gefixed)",
+        "title": "Getrennte Wege",
         "difficulty": "Mittel",
         "xpReward": 350,
         "gridSize": {
