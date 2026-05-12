@@ -10,6 +10,7 @@ class HydraGame {
         this.offsetX = 0;
         this.offsetY = 0;
         this.isFlowing = false;
+        this.usedSolution = false; // Neu: Flag für Lösungsnutzung
         
         this.colorMap = {
             'blue': '#3b82f6', 'yellow': '#eab308', 'red': '#ef4444',
@@ -86,6 +87,7 @@ class HydraGame {
     startLevel(index) {
         this.currentLevel = JSON.parse(JSON.stringify(HYDRA_LEVELS[index]));
         this.isFlowing = false;
+        this.usedSolution = false;
         const { cols, rows } = this.currentLevel.gridSize;
         this.cellSize = Math.min(this.canvas.width / (cols + 1), this.canvas.height / (rows + 3));
         if (this.cellSize > 70) this.cellSize = 70;
@@ -171,11 +173,46 @@ class HydraGame {
             this.startLevel(this.currentLevel.id - 1);
         };
         
+        document.getElementById('btn-solution').onclick = () => {
+            this.showSolution();
+        };
+        
         document.getElementById('btn-next').onclick = () => {
             document.getElementById('win-overlay').classList.add('hidden');
             if (this.currentLevel.id < HYDRA_LEVELS.length) this.startLevel(this.currentLevel.id);
             else location.reload();
         }
+    }
+    
+    // NEU: Automatisches Lösen
+    showSolution() {
+        if (!this.currentLevel || !this.currentLevel.solution) return;
+        this.isFlowing = false;
+        
+        // Raster aufräumen
+        for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
+            for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
+                if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') {
+                    this.grid[r][c] = null;
+                }
+            }
+        }
+        
+        // Lösung einsetzen
+        this.currentLevel.solution.forEach(comp => {
+            if (this.grid[comp.y] && this.grid[comp.y][comp.x] === null) {
+                this.grid[comp.y][comp.x] = { type: comp.type, rotation: comp.rotation };
+            }
+        });
+        
+        // Inventar nullen, da Lösung liegt
+        const inv = this.currentLevel.inventory;
+        inv.pipes_straight = 0; inv.pipes_angle = 0; inv.pipes_cross = 0;
+        inv.andGates = 0; inv.mixers = 0;
+        
+        this.usedSolution = true;
+        this.updateUI();
+        this.calculateFlow();
     }
 
     handleCellClick(x, y) {
@@ -345,7 +382,8 @@ class HydraGame {
         this.currentLevel.targets.forEach(t => { if (t.currentFlow !== t.requiredColor) won = false; });
         if (won) {
             setTimeout(() => {
-                const xp = this.currentLevel.xpReward;
+                let xp = this.usedSolution ? 0 : this.currentLevel.xpReward;
+                
                 this.playerStats.xp += xp;
                 this.playerStats.stars += 1;
                 if (this.currentLevel.id >= this.playerStats.unlockedLevels) {
@@ -354,13 +392,26 @@ class HydraGame {
                 localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
                 this.updateUI();
                 
+                const winTitle = document.getElementById('win-title');
+                const winSub = document.getElementById('win-subtitle');
                 const winXp = document.getElementById('win-xp');
-                if (winXp) winXp.textContent = `+${xp} XP`;
                 
-                const overlay = document.getElementById('win-overlay');
-                const controls = document.getElementById('game-controls');
-                if(overlay) overlay.classList.remove('hidden');
-                if(controls) controls.classList.add('hidden');
+                if (this.usedSolution) {
+                    winTitle.textContent = "Level Übersprungen";
+                    winTitle.className = "text-4xl font-bold text-slate-300 mb-2 drop-shadow-lg text-center";
+                    winSub.textContent = "Du hast dir die Lösung anzeigen lassen.";
+                    winXp.textContent = "0 XP";
+                    winXp.className = "text-2xl text-slate-500 mb-8 font-bold";
+                } else {
+                    winTitle.textContent = "Level Abgeschlossen!";
+                    winTitle.className = "text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-2 drop-shadow-lg text-center";
+                    winSub.textContent = "";
+                    winXp.textContent = `+${xp} XP`;
+                    winXp.className = "text-2xl text-cyan-300 mb-8 font-bold";
+                }
+                
+                document.getElementById('win-overlay').classList.remove('hidden');
+                document.getElementById('game-controls').classList.add('hidden');
             }, 600);
         }
     }
