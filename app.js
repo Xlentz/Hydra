@@ -1,5 +1,4 @@
 
-// Audio Engine using Web Audio API
 class AudioEngine {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -33,7 +32,7 @@ class AudioEngine {
     
     playWin() {
         if (!this.enabled || this.ctx.state === 'suspended') return;
-        const notes = [440, 554, 659, 880]; // A C# E A
+        const notes = [440, 554, 659, 880];
         notes.forEach((freq, i) => {
             const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
             osc.type = 'sine'; osc.frequency.value = freq;
@@ -53,6 +52,7 @@ class HydraGame {
         
         this.currentLevel = null;
         this.grid = []; 
+        this.initialInventory = null; // Fix: Store initial inventory to prevent UI jumps
         this.activeTool = 'PIPE_STRAIGHT';
         this.cellSize = 60;
         this.offsetX = 0; this.offsetY = 0;
@@ -60,11 +60,9 @@ class HydraGame {
         this.isFlowing = false;
         this.usedSolution = false;
         this.clicks = 0;
-        this.flowAnimationProgress = 0; // 0 to 100
+        this.flowAnimationProgress = 0; 
         
         this.colorMap = { 'blue': '#3b82f6', 'yellow': '#eab308', 'red': '#ef4444', 'green': '#22c55e', 'purple': '#a855f7', 'orange': '#f97316' };
-        
-        // Shape map for colorblind mode
         this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
@@ -75,7 +73,6 @@ class HydraGame {
         this.init();
         window.addEventListener('resize', () => this.resize());
         
-        // Ensure Audio starts on interaction
         document.body.addEventListener('click', () => {
             if(this.audio.ctx.state === 'suspended') this.audio.ctx.resume();
         }, {once: true});
@@ -111,7 +108,7 @@ class HydraGame {
         setEl('player-xp', this.playerStats.xp);
         setEl('player-stars', this.playerStats.stars);
         
-        if (this.currentLevel) {
+        if (this.currentLevel && this.initialInventory) {
             setEl('inv-straight', this.currentLevel.inventory.pipes_straight || 0);
             setEl('inv-angle', this.currentLevel.inventory.pipes_angle || 0);
             setEl('inv-cross', this.currentLevel.inventory.pipes_cross || 0);
@@ -121,11 +118,24 @@ class HydraGame {
             setEl('inv-portal', this.currentLevel.inventory.portals || 0);
             setEl('inv-valve', this.currentLevel.inventory.valves || 0);
             
-            // Hide tools if 0 initially
-            ['straight','angle','cross','and','mix','split','portal','valve'].forEach(t => {
-                const b = document.getElementById(`btn-t-${t}`);
-                if(b) b.style.display = (this.currentLevel.inventory[`pipes_${t}`] || this.currentLevel.inventory[`${t}s`] || this.currentLevel.inventory[`${t}Gates`] || this.currentLevel.inventory[t+'s'] !== undefined) ? 'flex' : 'none';
-            });
+            // FIX: Correctly check exact keys from initialInventory to show/hide tools
+            const toolKeys = {
+                'straight': 'pipes_straight',
+                'angle': 'pipes_angle',
+                'cross': 'pipes_cross',
+                'and': 'andGates',
+                'mix': 'mixers',
+                'split': 'splitters',
+                'portal': 'portals',
+                'valve': 'valves'
+            };
+            
+            for (let t in toolKeys) {
+                const btn = document.getElementById(`btn-t-${t}`);
+                if (btn) {
+                    btn.style.display = (this.initialInventory[toolKeys[t]] > 0) ? 'flex' : 'none';
+                }
+            }
             
             setEl('header-level-info', `Level ${this.currentLevel.id}`);
             setEl('click-counter', this.clicks);
@@ -135,7 +145,6 @@ class HydraGame {
         const unlocked = this.playerStats.unlockedLevels;
         const a1 = document.getElementById('ach-1'); if(a1 && unlocked > 1) a1.classList.add('unlocked');
         
-        // Toggles
         const audioBtn = document.getElementById('toggle-audio');
         const audioKnob = document.getElementById('audio-knob');
         if(audioBtn) {
@@ -170,6 +179,9 @@ class HydraGame {
 
     startLevel(index) {
         this.currentLevel = JSON.parse(JSON.stringify(HYDRA_LEVELS[index]));
+        // FIX: Speichere das anfängliche Inventar separat ab, damit die Buttons korrekt angezeigt werden
+        this.initialInventory = JSON.parse(JSON.stringify(this.currentLevel.inventory));
+        
         this.isFlowing = false;
         this.usedSolution = false;
         this.clicks = 0;
@@ -261,10 +273,9 @@ class HydraGame {
             this.audio.playFlowStart();
             this.calculateFlow(false);
             
-            // Start Animation
             this.flowAnimationProgress = 0;
             const animInterval = setInterval(() => {
-                this.flowAnimationProgress += 5; // Fill speed
+                this.flowAnimationProgress += 5;
                 if(this.flowAnimationProgress >= 100) {
                     clearInterval(animInterval);
                     this.checkWinCondition();
@@ -287,7 +298,6 @@ class HydraGame {
         }
     }
     
-    // Minimalistic Level Editor
     setupEditor() {
         const overlay = document.getElementById('editor-overlay');
         const c = document.getElementById('editor-canvas');
@@ -454,8 +464,8 @@ class HydraGame {
         if (t === 'PIPE_CROSS') return [0, 1, 2, 3];
         if (t === 'AND_GATE' || t === 'MIXER') return [0, 1, 2, 3];
         if (t === 'SPLITTER') return [0, 1, 2, 3];
-        if (t === 'VALVE') return [0, 1, 2, 3]; // Needs special logic for flow, but structurally has 4 ports
-        if (t === 'PORTAL') return [0, 1, 2, 3]; // Accepts from anywhere
+        if (t === 'VALVE') return [0, 1, 2, 3]; 
+        if (t === 'PORTAL') return [0, 1, 2, 3]; 
         return [];
     }
 
@@ -473,7 +483,6 @@ class HydraGame {
     calculateFlow(silent = true) {
         if (!this.currentLevel) return;
         
-        // Find portals
         let portals = [];
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
@@ -487,7 +496,7 @@ class HydraGame {
         }
         this.currentLevel.targets.forEach(t => t.currentFlow = null);
         
-        if (!this.isFlowing && !silent) return; // Silent = calculate for visual cues without actually "winning"
+        if (!this.isFlowing && !silent) return; 
 
         let queue = [];
         this.currentLevel.sources.forEach(s => {
@@ -502,17 +511,15 @@ class HydraGame {
             let node = queue.shift();
             let currentCell = this.grid[node.y][node.x];
             
-            // PORTAL JUMP
             if (currentCell && currentCell.type === 'PORTAL' && portals.length === 2) {
                 let other = portals.find(p => p.x !== node.x || p.y !== node.y);
                 if (other) {
                     let otherCell = this.grid[other.y][other.x];
                     if(!otherCell.flows['out']) {
                         otherCell.flows['out'] = node.color;
-                        // Portal emits in all directions
                         queue.push({x: other.x, y: other.y, color: node.color, fromDir: null});
                     }
-                    continue; // Stop processing this portal's neighbors directly, it jumped
+                    continue; 
                 }
             }
 
@@ -528,11 +535,10 @@ class HydraGame {
                     let inline = (r%2===0) ? [1,3] : [0,2];
                     let control = (r%2===0) ? [0,2] : [1,3];
                     
-                    // If we are water trying to move INLINE, check if CONTROL has pressure
                     if(inline.includes(move.d)) {
                         let hasPressure = false;
                         control.forEach(cdir => { if(currentCell.flows[cdir]) hasPressure = true; });
-                        if(!hasPressure) return; // Blocked
+                        if(!hasPressure) return; 
                     }
                 }
 
@@ -557,7 +563,6 @@ class HydraGame {
                             queue.push({x: nx, y: ny, color: node.color, fromDir: move.d});
                         }
                         else if (cell.type === 'VALVE') {
-                            // Collect pressure
                             cell.flows[move.d] = node.color;
                             let r = cell.rotation || 0;
                             let inline = (r%2===0) ? [1,3] : [0,2];
@@ -591,7 +596,6 @@ class HydraGame {
                             let unmix = this.unmixColor(node.color);
                             if(unmix.length === 2) {
                                 cell.flows['out1'] = unmix[0]; cell.flows['out2'] = unmix[1];
-                                // Simple logic: send out1 straight, out2 sides (or whatever works physically)
                                 queue.push({x: nx, y: ny, color: unmix[0], fromDir: null});
                                 queue.push({x: nx, y: ny, color: unmix[1], fromDir: null});
                             } else {
@@ -625,7 +629,6 @@ class HydraGame {
         if (won) {
             this.audio.playWin();
             
-            // Calc Stars
             let par = this.currentLevel.parClicks || 10;
             let earnedStars = 1;
             if(this.usedSolution) earnedStars = 0;
@@ -704,7 +707,7 @@ class HydraGame {
         else if(shape==='square') this.ctx.rect(x-4,y-4,8,8);
         else if(shape==='triangle') { this.ctx.moveTo(x,y-5); this.ctx.lineTo(x-4,y+4); this.ctx.lineTo(x+4,y+4); }
         else if(shape==='diamond') { this.ctx.moveTo(x,y-5); this.ctx.lineTo(x+4,y); this.ctx.lineTo(x,y+5); this.ctx.lineTo(x-4,y); }
-        else this.ctx.arc(x,y,4,0,Math.PI*2); // fallback
+        else this.ctx.arc(x,y,4,0,Math.PI*2); 
         this.ctx.fill();
     }
 
@@ -742,7 +745,6 @@ class HydraGame {
             this.ctx.fillStyle = "#1e293b";
             this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
 
-            // Simple animation reveal
             let isFilled = target.currentFlow;
             if(this.isFlowing && this.flowAnimationProgress < 90) isFilled = false;
 
@@ -787,7 +789,7 @@ class HydraGame {
                     wCol = Object.values(cell.flows)[0]; 
                 }
                 
-                let showWater = wCol && (!this.isFlowing || this.flowAnimationProgress > 10); // simplified anim
+                let showWater = wCol && (!this.isFlowing || this.flowAnimationProgress > 10); 
 
                 if (cell.type === 'PIPE_STRAIGHT') {
                     this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hw, -hPw, s, pW);
@@ -824,11 +826,10 @@ class HydraGame {
                     if(flowH && (!this.isFlowing || this.flowAnimationProgress > 10)) { this.ctx.fillStyle = this.colorMap[flowH]; this.ctx.fillRect(-hw, -hPw + 4, animP, pW - 8); this.drawCB(-hw/2, 0, flowH); }
                 }
                 else if (cell.type === 'VALVE') {
-                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hw, -hPw, s, pW); // main pipe
+                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hw, -hPw, s, pW); 
                     this.ctx.fillStyle = "#94a3b8"; this.ctx.fillRect(-hw, -hPw, s, 2); this.ctx.fillRect(-hw, hPw - 2, s, 2);
-                    this.ctx.fillStyle = "#475569"; this.ctx.fillRect(-hPw, -hw, pW, s); // control pipe
+                    this.ctx.fillStyle = "#475569"; this.ctx.fillRect(-hPw, -hw, pW, s); 
                     
-                    // Wheel
                     this.ctx.fillStyle = "#ef4444"; this.ctx.beginPath(); this.ctx.arc(0,0,hPw+2, 0, Math.PI*2); this.ctx.fill();
                     
                     let inlineFlow = (cell.flows && (cell.flows[1] || cell.flows[3]));
