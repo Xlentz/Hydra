@@ -45,7 +45,6 @@ class HydraGame {
         this.offsetY = (this.canvas.height - gridH) / 2 - 40; 
     }
 
-    // NULL CHECKS added to prevent silent JS crashes when UI elements change!
     updateUI() {
         const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         
@@ -277,14 +276,13 @@ class HydraGame {
             iters++;
             let node = queue.shift();
 
-            // BUGFIX for Cross Pipe logic: water inside a cross pipe can ONLY exit straight ahead.
             let currentCell = this.grid[node.y][node.x];
 
             DIRS.forEach(move => {
-                if (move.d === (node.fromDir + 2) % 4) return; // Don't flow backward
+                if (move.d === (node.fromDir + 2) % 4) return; 
 
                 if (currentCell && currentCell.type === 'PIPE_CROSS' && node.fromDir !== -1) {
-                    if (move.d !== node.fromDir) return; // STRICTLY Straight!
+                    if (move.d !== node.fromDir) return; 
                 }
 
                 let nx = node.x + move.dx;
@@ -372,9 +370,11 @@ class HydraGame {
         if (this.currentLevel) {
             this.ctx.save();
             this.ctx.translate(this.offsetX, this.offsetY);
+            
             this.drawGridLines();
-            this.drawPlacedComponents();
             this.drawSourcesAndTargets();
+            this.drawPlacedComponents();
+            
             this.ctx.restore();
         }
         requestAnimationFrame(() => this.gameLoop());
@@ -390,6 +390,49 @@ class HydraGame {
         for(let c = 0; c <= cols; c++) {
             this.ctx.beginPath(); this.ctx.moveTo(c * this.cellSize, 0); this.ctx.lineTo(c * this.cellSize, rows * this.cellSize); this.ctx.stroke();
         }
+    }
+
+    drawSourcesAndTargets() {
+        const s = this.cellSize;
+        const hw = s / 2;
+        this.currentLevel.sources.forEach(source => {
+            const x = source.x * s; const y = source.y * s;
+
+            // Connection Lines
+            this.ctx.fillStyle = "#475569";
+            this.ctx.fillRect(x + hw - 6, y, 12, s);
+            this.ctx.fillRect(x, y + hw - 6, s, 12);
+
+            this.ctx.fillStyle = this.colorMap[source.color];
+            this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[source.color];
+            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+            this.ctx.shadowBlur = 0; 
+            
+            this.ctx.fillStyle = "#f8fafc";
+            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, 4, 0, Math.PI * 2); this.ctx.fill();
+        });
+
+        this.currentLevel.targets.forEach(target => {
+            const x = target.x * s; const y = target.y * s;
+
+            // Connection Lines
+            this.ctx.fillStyle = "#475569";
+            this.ctx.fillRect(x + hw - 6, y, 12, s);
+            this.ctx.fillRect(x, y + hw - 6, s, 12);
+
+            this.ctx.strokeStyle = this.colorMap[target.requiredColor];
+            this.ctx.lineWidth = 4; this.ctx.setLineDash([5, 5]);
+            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.4, 0, Math.PI * 2); this.ctx.stroke();
+            this.ctx.setLineDash([]); 
+            
+            this.ctx.fillStyle = "#1e293b";
+            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+
+            if (target.currentFlow) {
+                this.ctx.fillStyle = this.colorMap[target.currentFlow];
+                this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.3, 0, Math.PI * 2); this.ctx.fill();
+            }
+        });
     }
 
     drawPlacedComponents() {
@@ -413,101 +456,101 @@ class HydraGame {
                 this.ctx.save();
                 this.ctx.translate(x + hw, y + hw);
                 
-                if (cell.rotation !== undefined) {
+                if (cell.rotation !== undefined && ['PIPE_STRAIGHT', 'PIPE_ANGLE'].includes(cell.type)) {
                     this.ctx.rotate(cell.rotation * Math.PI / 2);
                 }
 
-                this.ctx.fillStyle = "rgba(50, 60, 80, 0.9)";
-                this.ctx.strokeStyle = "rgba(150, 160, 180, 0.5)";
-                this.ctx.lineWidth = 2;
+                const pW = s * 0.3; // Pipe visual width
+                const hPw = pW / 2;
                 
                 let wCol = null;
-                if(cell.flows) { wCol = Object.values(cell.flows)[0]; }
-
-                const drawWater = (color) => {
-                    if(!color) return;
-                    this.ctx.fillStyle = this.colorMap[color];
-                };
+                if(cell.flows && Object.keys(cell.flows).length > 0) { 
+                    wCol = Object.values(cell.flows)[0]; 
+                }
 
                 if (cell.type === 'PIPE_STRAIGHT') {
-                    this.ctx.fillRect(-s, -s*0.25, s*2, s*0.5);
-                    this.ctx.strokeRect(-s, -s*0.25, s*2, s*0.5);
-                    if(wCol) { drawWater(wCol); this.ctx.fillRect(-s, -s*0.15, s*2, s*0.3); }
-                } 
-                else if (cell.type === 'PIPE_ANGLE') {
-                    this.ctx.fillRect(-s*0.25, -s, s*0.5, s*1.25);
-                    this.ctx.fillRect(-s*0.25, -s*0.25, s*1.25, s*0.5);
-                    this.ctx.strokeRect(-s*0.25, -s, s*0.5, s*1.25);
-                    this.ctx.strokeRect(-s*0.25, -s*0.25, s*1.25, s*0.5);
-                    this.ctx.fillRect(-s*0.22, -s*0.22, s*0.44, s*0.44);
+                    this.ctx.fillStyle = "#334155";
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
+                    
+                    this.ctx.fillStyle = "#94a3b8";
+                    this.ctx.fillRect(-hw, -hPw, s, 2);
+                    this.ctx.fillRect(-hw, hPw - 2, s, 2);
                     
                     if(wCol) { 
-                        drawWater(wCol); 
-                        this.ctx.fillRect(-s*0.15, -s, s*0.3, s);
-                        this.ctx.fillRect(-s*0.15, -s*0.15, s, s*0.3);
+                        this.ctx.fillStyle = this.colorMap[wCol]; 
+                        this.ctx.fillRect(-hw, -hPw + 4, s, pW - 8); 
+                    }
+                } 
+                else if (cell.type === 'PIPE_ANGLE') {
+                    this.ctx.fillStyle = "#334155";
+                    this.ctx.fillRect(-hPw, -hw, pW, hw + hPw);
+                    this.ctx.fillRect(-hPw, -hPw, hw + hPw, pW);
+                    
+                    this.ctx.fillStyle = "#94a3b8";
+                    this.ctx.fillRect(-hPw, -hw, 2, hw + hPw); // L top
+                    this.ctx.fillRect(-hPw, hPw - 2, hw + hPw, 2); // B right
+                    this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw + 2); // R top inner
+                    this.ctx.fillRect(hPw - 2, -hPw, hw - hPw + 2, 2); // T right inner
+                    
+                    if(wCol) { 
+                        this.ctx.fillStyle = this.colorMap[wCol];
+                        this.ctx.fillRect(-hPw + 4, -hw, pW - 8, hw + hPw - 4);
+                        this.ctx.fillRect(-hPw + 4, -hPw + 4, hw + hPw - 4, pW - 8);
                     }
                 }
                 else if (cell.type === 'PIPE_CROSS') {
-                    this.ctx.fillRect(-s*0.25, -s, s*0.5, s*2);
-                    this.ctx.fillRect(-s, -s*0.25, s*2, s*0.5);
-                    this.ctx.strokeRect(-s*0.25, -s, s*0.5, s*2);
-                    this.ctx.strokeRect(-s, -s*0.25, s*2, s*0.5);
-                    this.ctx.fillRect(-s*0.22, -s*0.22, s*0.44, s*0.44);
+                    this.ctx.fillStyle = "#334155";
+                    this.ctx.fillRect(-hPw, -hw, pW, s);
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
                     
-                    // BUGFIX for visual cross rendering!
+                    this.ctx.fillStyle = "#94a3b8";
+                    this.ctx.fillRect(-hw, -hPw, hw - hPw, 2);
+                    this.ctx.fillRect(-hPw, -hw, 2, hw - hPw);
+                    this.ctx.fillRect(hPw, -hPw, hw - hPw, 2);
+                    this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw);
+                    this.ctx.fillRect(-hw, hPw - 2, hw - hPw, 2);
+                    this.ctx.fillRect(-hPw, hPw, 2, hw - hPw);
+                    this.ctx.fillRect(hPw, hPw - 2, hw - hPw, 2);
+                    this.ctx.fillRect(hPw - 2, hPw, 2, hw - hPw);
+                    
                     let flowV = (cell.flows && (cell.flows[0] || cell.flows[2]));
                     let flowH = (cell.flows && (cell.flows[1] || cell.flows[3]));
                     
-                    if(flowV) { drawWater(flowV); this.ctx.fillRect(-s*0.15, -s, s*0.3, s*2); }
-                    if(flowH) { drawWater(flowH); this.ctx.fillRect(-s, -s*0.15, s*2, s*0.3); }
+                    if(flowV) { this.ctx.fillStyle = this.colorMap[flowV]; this.ctx.fillRect(-hPw + 4, -hw, pW - 8, s); }
+                    if(flowH) { this.ctx.fillStyle = this.colorMap[flowH]; this.ctx.fillRect(-hw, -hPw + 4, s, pW - 8); }
                 }
-                else if (cell.type === 'AND_GATE') {
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2);
-                    this.ctx.fill(); this.ctx.stroke();
-                    this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 16px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("&", 0, 6);
-                    if(cell.flows && cell.flows['out']) {
-                        drawWater(cell.flows['out']);
-                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI * 2); this.ctx.fill();
-                    }
-                }
-                else if (cell.type === 'MIXER') {
-                    this.ctx.fillRect(-s*0.4, -s*0.4, s*0.8, s*0.8);
-                    this.ctx.strokeRect(-s*0.4, -s*0.4, s*0.8, s*0.8);
-                    this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 12px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("MIX", 0, 4);
-                    if(cell.flows && cell.flows['out']) {
-                        drawWater(cell.flows['out']);
-                        this.ctx.fillRect(-s*0.3, -s*0.3, s*0.6, s*0.6);
+                else if (cell.type === 'AND_GATE' || cell.type === 'MIXER') {
+                    this.ctx.fillStyle = "#475569";
+                    this.ctx.fillRect(-6, -hw, 12, s); // V ports
+                    this.ctx.fillRect(-hw, -6, s, 12); // H ports
+                    
+                    if (cell.type === 'AND_GATE') {
+                        this.ctx.fillStyle = "#1e293b";
+                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.stroke();
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 16px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("&", 0, 6);
+                        
+                        if(cell.flows && cell.flows['out']) {
+                            this.ctx.fillStyle = this.colorMap[cell.flows['out']];
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI * 2); this.ctx.fill();
+                        }
+                    } else {
+                        this.ctx.fillStyle = "#1e293b";
+                        this.ctx.fillRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
+                        this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.strokeRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 12px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("MIX", 0, 4);
+                        
+                        if(cell.flows && cell.flows['out']) {
+                            this.ctx.fillStyle = this.colorMap[cell.flows['out']];
+                            this.ctx.fillRect(-s*0.25, -s*0.25, s*0.5, s*0.5);
+                        }
                     }
                 }
 
                 this.ctx.restore();
             }
         }
-    }
-
-    drawSourcesAndTargets() {
-        const s = this.cellSize;
-        const hw = s / 2;
-        this.currentLevel.sources.forEach(source => {
-            const x = source.x * s; const y = source.y * s;
-            this.ctx.fillStyle = this.colorMap[source.color];
-            this.ctx.shadowBlur = 10; this.ctx.shadowColor = this.colorMap[source.color];
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
-            this.ctx.shadowBlur = 0; 
-            this.ctx.fillStyle = "#94a3b8"; this.ctx.fillRect(x + hw - 5, y + hw - 5, 10, 10);
-        });
-
-        this.currentLevel.targets.forEach(target => {
-            const x = target.x * s; const y = target.y * s;
-            this.ctx.strokeStyle = this.colorMap[target.requiredColor];
-            this.ctx.lineWidth = 4; this.ctx.setLineDash([5, 5]);
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.4, 0, Math.PI * 2); this.ctx.stroke();
-            this.ctx.setLineDash([]); 
-            if (target.currentFlow) {
-                this.ctx.fillStyle = this.colorMap[target.currentFlow];
-                this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.3, 0, Math.PI * 2); this.ctx.fill();
-            }
-        });
     }
 }
 const game = new HydraGame();
