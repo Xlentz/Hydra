@@ -10,7 +10,7 @@ class HydraGame {
         this.offsetX = 0;
         this.offsetY = 0;
         this.isFlowing = false;
-        this.usedSolution = false; // Neu: Flag für Lösungsnutzung
+        this.usedSolution = false; 
         
         this.colorMap = {
             'blue': '#3b82f6', 'yellow': '#eab308', 'red': '#ef4444',
@@ -184,12 +184,10 @@ class HydraGame {
         }
     }
     
-    // NEU: Automatisches Lösen
     showSolution() {
         if (!this.currentLevel || !this.currentLevel.solution) return;
         this.isFlowing = false;
         
-        // Raster aufräumen
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
                 if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') {
@@ -198,14 +196,12 @@ class HydraGame {
             }
         }
         
-        // Lösung einsetzen
         this.currentLevel.solution.forEach(comp => {
             if (this.grid[comp.y] && this.grid[comp.y][comp.x] === null) {
                 this.grid[comp.y][comp.x] = { type: comp.type, rotation: comp.rotation };
             }
         });
         
-        // Inventar nullen, da Lösung liegt
         const inv = this.currentLevel.inventory;
         inv.pipes_straight = 0; inv.pipes_angle = 0; inv.pipes_cross = 0;
         inv.andGates = 0; inv.mixers = 0;
