@@ -52,7 +52,7 @@ class HydraGame {
         
         this.currentLevel = null;
         this.grid = []; 
-        this.initialInventory = null; // Fix: Store initial inventory to prevent UI jumps
+        this.initialInventory = null; 
         this.activeTool = 'PIPE_STRAIGHT';
         this.cellSize = 60;
         this.offsetX = 0; this.offsetY = 0;
@@ -118,7 +118,6 @@ class HydraGame {
             setEl('inv-portal', this.currentLevel.inventory.portals || 0);
             setEl('inv-valve', this.currentLevel.inventory.valves || 0);
             
-            // FIX: Correctly check exact keys from initialInventory to show/hide tools
             const toolKeys = {
                 'straight': 'pipes_straight',
                 'angle': 'pipes_angle',
@@ -179,7 +178,6 @@ class HydraGame {
 
     startLevel(index) {
         this.currentLevel = JSON.parse(JSON.stringify(HYDRA_LEVELS[index]));
-        // FIX: Speichere das anfängliche Inventar separat ab, damit die Buttons korrekt angezeigt werden
         this.initialInventory = JSON.parse(JSON.stringify(this.currentLevel.inventory));
         
         this.isFlowing = false;
@@ -523,6 +521,8 @@ class HydraGame {
                 }
             }
 
+            let splitOutIndex = 0; // FIX: Keeps track of which split color goes to which output
+
             DIRS.forEach(move => {
                 if (node.fromDir !== null && move.d === (node.fromDir + 2) % 4) return; 
 
@@ -548,31 +548,42 @@ class HydraGame {
                 if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
                     if (!this.canConnect(node.x, node.y, nx, ny, move.d)) return;
 
+                    let emitColor = node.color;
+                    
+                    // FIX: Dynamically assign split colors to the first two valid connected pipes
+                    if (node.color === 'split_trigger') {
+                        emitColor = node.colors[splitOutIndex % 2];
+                        splitOutIndex++;
+                        // Save to Splitter for rendering
+                        if(splitOutIndex === 1) currentCell.flows['out1_rendered'] = emitColor;
+                        if(splitOutIndex === 2) currentCell.flows['out2_rendered'] = emitColor;
+                    }
+
                     let target = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
                     if (target) {
-                        target.currentFlow = node.color;
+                        target.currentFlow = emitColor;
                         return; 
                     }
 
                     let cell = this.grid[ny][nx];
                     if (cell && cell.type !== 'WALL') {
-                        if(cell.flows[move.d] === node.color) return; 
+                        if(cell.flows[move.d] === emitColor) return; 
                         
                         if (cell.type.startsWith('PIPE') || cell.type === 'PORTAL') {
-                            cell.flows[move.d] = node.color; 
-                            queue.push({x: nx, y: ny, color: node.color, fromDir: move.d});
+                            cell.flows[move.d] = emitColor; 
+                            queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
                         }
                         else if (cell.type === 'VALVE') {
-                            cell.flows[move.d] = node.color;
+                            cell.flows[move.d] = emitColor;
                             let r = cell.rotation || 0;
                             let inline = (r%2===0) ? [1,3] : [0,2];
                             if(inline.includes(move.d)) {
-                                queue.push({x: nx, y: ny, color: node.color, fromDir: move.d});
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
                             }
                         }
                         else if (cell.type === 'AND_GATE') {
                             cell.inputOrigins.add(move.d);
-                            if(!cell.inputs.includes(node.color)) cell.inputs.push(node.color);
+                            if(!cell.inputs.includes(emitColor)) cell.inputs.push(emitColor);
                             
                             if (cell.inputOrigins.size >= 2) {
                                 cell.flows['out'] = cell.inputs[0]; 
@@ -581,7 +592,7 @@ class HydraGame {
                         }
                         else if (cell.type === 'MIXER') {
                             cell.inputOrigins.add(move.d);
-                            if (!cell.inputs.includes(node.color)) cell.inputs.push(node.color);
+                            if (!cell.inputs.includes(emitColor)) cell.inputs.push(emitColor);
                             
                             if (cell.inputOrigins.size >= 2) {
                                 let mixed = this.mixColors(cell.inputs[0], cell.inputs[1]);
@@ -593,14 +604,12 @@ class HydraGame {
                         }
                         else if (cell.type === 'SPLITTER') {
                             cell.inputOrigins.add(move.d);
-                            let unmix = this.unmixColor(node.color);
+                            let unmix = this.unmixColor(emitColor);
                             if(unmix.length === 2) {
-                                cell.flows['out1'] = unmix[0]; cell.flows['out2'] = unmix[1];
-                                queue.push({x: nx, y: ny, color: unmix[0], fromDir: null});
-                                queue.push({x: nx, y: ny, color: unmix[1], fromDir: null});
+                                // Push the trigger instead of standard color
+                                queue.push({x: nx, y: ny, color: 'split_trigger', colors: unmix, fromDir: move.d});
                             } else {
-                                cell.flows['out1'] = node.color;
-                                queue.push({x: nx, y: ny, color: node.color, fromDir: move.d});
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
                             }
                         }
                     }
@@ -863,8 +872,19 @@ class HydraGame {
                         this.ctx.fillStyle = "#1e293b"; this.ctx.beginPath(); this.ctx.moveTo(0,-s*0.35); this.ctx.lineTo(s*0.35,s*0.35); this.ctx.lineTo(-s*0.35,s*0.35); this.ctx.fill();
                         this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.stroke();
                         this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 10px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("SPLIT", 0, s*0.2);
-                        if(cell.flows && cell.flows['out1'] && (!this.isFlowing || this.flowAnimationProgress > 60)) {
-                            this.ctx.fillStyle = this.colorMap[cell.flows['out1']]; this.ctx.beginPath(); this.ctx.arc(0, 0, 4, 0, Math.PI*2); this.ctx.fill();
+                        
+                        // FIX: Show the two correctly assigned colors
+                        if(cell.flows && (!this.isFlowing || this.flowAnimationProgress > 60)) {
+                            if(cell.flows['out1_rendered']) {
+                                this.ctx.fillStyle = this.colorMap[cell.flows['out1_rendered']];
+                                this.ctx.beginPath(); this.ctx.arc(-s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
+                                this.drawCB(-s*0.15, s*0.15, cell.flows['out1_rendered']);
+                            }
+                            if(cell.flows['out2_rendered']) {
+                                this.ctx.fillStyle = this.colorMap[cell.flows['out2_rendered']];
+                                this.ctx.beginPath(); this.ctx.arc(s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
+                                this.drawCB(s*0.15, s*0.15, cell.flows['out2_rendered']);
+                            }
                         }
                     }
                 }
