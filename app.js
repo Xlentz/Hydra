@@ -5,9 +5,8 @@ class HydraGame {
         this.ctx = this.canvas.getContext('2d');
         this.currentLevel = null;
         this.grid = []; 
-        this.flows = [];
         this.activeTool = 'PIPE';
-        this.cellSize = 40;
+        this.cellSize = 50;
         this.offsetX = 0;
         this.offsetY = 0;
         this.isFlowing = false;
@@ -22,7 +21,7 @@ class HydraGame {
         };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
-            xp: 0, stars: 0, unlockedLevels: 1
+            name: "Gast-Techniker", xp: 0, stars: 0, unlockedLevels: 1
         };
 
         this.init();
@@ -47,10 +46,11 @@ class HydraGame {
         const gridW = this.currentLevel.gridSize.cols * this.cellSize;
         const gridH = this.currentLevel.gridSize.rows * this.cellSize;
         this.offsetX = (this.canvas.width - gridW) / 2;
-        this.offsetY = (this.canvas.height - gridH) / 2 - 50; // shift up a bit for UI
+        this.offsetY = (this.canvas.height - gridH) / 2 - 40; 
     }
 
     updateUI() {
+        document.getElementById('player-name').textContent = this.playerStats.name;
         document.getElementById('player-xp').textContent = this.playerStats.xp;
         document.getElementById('player-stars').textContent = this.playerStats.stars;
         
@@ -58,6 +58,7 @@ class HydraGame {
             document.getElementById('inv-pipes').textContent = this.currentLevel.inventory.pipes;
             document.getElementById('inv-and').textContent = this.currentLevel.inventory.andGates;
             document.getElementById('inv-mix').textContent = this.currentLevel.inventory.mixers;
+            document.getElementById('header-level').textContent = this.currentLevel.id;
         }
     }
 
@@ -69,10 +70,11 @@ class HydraGame {
             const btn = document.createElement('button');
             const isLocked = index + 1 > this.playerStats.unlockedLevels;
             
-            btn.className = `h-12 w-12 flex items-center justify-center rounded-xl font-bold transition-all ${
-                isLocked ? 'bg-slate-800 text-slate-600 border border-slate-700' : 'bg-cyan-900 text-cyan-100 hover:bg-cyan-700 shadow-lg shadow-cyan-900/40 border border-cyan-500/50'
+            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all ${
+                isLocked ? 'bg-slate-800 text-slate-600 border border-slate-700 opacity-50' : 'bg-slate-800 text-cyan-100 hover:bg-cyan-900 shadow-lg border border-cyan-500/50'
             }`;
-            btn.textContent = level.id;
+            
+            btn.innerHTML = `<span class="text-xl">${level.id}</span>`;
             
             if (!isLocked) {
                 btn.onclick = () => this.startLevel(index);
@@ -86,12 +88,22 @@ class HydraGame {
         this.isFlowing = false;
         
         const { cols, rows } = this.currentLevel.gridSize;
-        this.cellSize = Math.min(this.canvas.width / (cols + 2), this.canvas.height / (rows + 4));
-        if (this.cellSize > 60) this.cellSize = 60;
+        // Make cells slightly bigger for better mobile touch
+        this.cellSize = Math.min(this.canvas.width / (cols + 1), this.canvas.height / (rows + 3));
+        if (this.cellSize > 65) this.cellSize = 65;
         
         this.centerGrid();
 
         this.grid = Array(rows).fill().map(() => Array(cols).fill(null));
+        
+        // Place walls in grid
+        if (this.currentLevel.walls) {
+            this.currentLevel.walls.forEach(w => {
+                if(this.grid[w.y] && this.grid[w.y][w.x] === null) {
+                    this.grid[w.y][w.x] = { type: 'WALL' };
+                }
+            });
+        }
         
         document.getElementById('level-title').textContent = this.currentLevel.title;
         document.getElementById('level-selection').classList.add('hidden');
@@ -102,7 +114,31 @@ class HydraGame {
     }
 
     setupEventListeners() {
-        // Tool Selection
+        // --- PROFILE LOGIC ---
+        const modal = document.getElementById('profile-modal');
+        const inputName = document.getElementById('input-player-name');
+        
+        document.getElementById('btn-open-profile').onclick = () => {
+            inputName.value = this.playerStats.name;
+            document.getElementById('modal-xp').textContent = this.playerStats.xp + ' XP';
+            document.getElementById('modal-stars').textContent = this.playerStats.stars;
+            modal.classList.remove('hidden');
+        };
+        
+        document.getElementById('btn-close-profile').onclick = () => {
+            modal.classList.add('hidden');
+        };
+        
+        document.getElementById('btn-save-profile').onclick = () => {
+            if(inputName.value.trim() !== '') {
+                this.playerStats.name = inputName.value.trim();
+                localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
+                this.updateUI();
+            }
+            modal.classList.add('hidden');
+        };
+
+        // --- TOOL LOGIC ---
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -112,7 +148,7 @@ class HydraGame {
             });
         });
 
-        // Grid Click
+        // --- GRID CLICK ---
         this.canvas.addEventListener('pointerdown', (e) => {
             if (!this.currentLevel || this.isFlowing) return;
             
@@ -141,7 +177,7 @@ class HydraGame {
         document.getElementById('btn-next').onclick = () => {
             document.getElementById('win-overlay').classList.add('hidden');
             if (this.currentLevel.id < HYDRA_LEVELS.length) {
-                this.startLevel(this.currentLevel.id); // Next level
+                this.startLevel(this.currentLevel.id); // Next
             } else {
                 location.reload(); // Game beaten
             }
@@ -149,21 +185,20 @@ class HydraGame {
     }
 
     handleCellClick(x, y) {
-        // Protect sources and targets
         if (this.isSourceOrTarget(x, y)) return;
 
         const cell = this.grid[y][x];
         const inv = this.currentLevel.inventory;
 
         if (this.activeTool === 'DELETE') {
-            if (cell) {
+            if (cell && cell.type !== 'WALL') {
                 if(cell.type === 'PIPE') inv.pipes++;
                 if(cell.type === 'AND_GATE') inv.andGates++;
                 if(cell.type === 'MIXER') inv.mixers++;
                 this.grid[y][x] = null;
             }
         } else {
-            if (cell) return; // Cell occupied
+            if (cell) return; // Cell occupied (by Wall or another tool)
 
             if (this.activeTool === 'PIPE' && inv.pipes > 0) {
                 this.grid[y][x] = { type: 'PIPE' };
@@ -178,7 +213,7 @@ class HydraGame {
         }
         
         this.updateUI();
-        this.calculateFlow(); // Reset flow preview
+        this.calculateFlow(); 
     }
     
     isSourceOrTarget(x, y) {
@@ -193,69 +228,77 @@ class HydraGame {
     calculateFlow() {
         if (!this.currentLevel) return;
         
-        // Reset all cell flow states
+        // Reset all cell flow states & target flows
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
-                if(this.grid[r][c]) {
+                if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') {
                     this.grid[r][c].waterColor = null;
                     this.grid[r][c].inputs = [];
+                    // For AND-Gates, track input origins to ensure they come from different directions
+                    this.grid[r][c].inputOrigins = new Set();
                 }
             }
         }
+        
+        this.currentLevel.targets.forEach(t => t.currentFlow = null);
 
-        if (!this.isFlowing) return; // Only preview layout until play clicked
+        if (!this.isFlowing) return;
 
         let activeNodes = [];
         this.currentLevel.sources.forEach(s => {
-            activeNodes.push({x: s.x, y: s.y, color: s.color});
+            activeNodes.push({x: s.x, y: s.y, color: s.color, originX: s.x, originY: s.y});
         });
 
         let visited = new Set();
         let iters = 0;
         
-        // Flow Simulation (Flood Fill)
-        while (activeNodes.length > 0 && iters < 1000) {
+        while (activeNodes.length > 0 && iters < 2000) {
             iters++;
             let node = activeNodes.shift();
-            let key = `${node.x},${node.y},${node.color}`;
+            
+            // To prevent infinite loops but allow crossing flows in pipes
+            let key = `${node.x},${node.y},${node.color},${node.originX},${node.originY}`;
             if (visited.has(key)) continue;
             visited.add(key);
 
-            // Propagate to neighbors
             const neighbors = [
                 {x: node.x+1, y: node.y}, {x: node.x-1, y: node.y},
                 {x: node.x, y: node.y+1}, {x: node.x, y: node.y-1}
             ];
 
             neighbors.forEach(n => {
+                // Don't flow backwards
+                if(n.x === node.originX && n.y === node.originY) return;
+
                 if (n.x >= 0 && n.x < this.currentLevel.gridSize.cols && n.y >= 0 && n.y < this.currentLevel.gridSize.rows) {
                     let cell = this.grid[n.y][n.x];
                     
-                    // Is it a target?
                     let target = this.currentLevel.targets.find(t => t.x === n.x && t.y === n.y);
                     if (target) {
                         target.currentFlow = node.color;
                     }
                     
-                    if (cell) {
+                    if (cell && cell.type !== 'WALL') {
                         if (cell.type === 'PIPE') {
-                            cell.waterColor = node.color;
-                            activeNodes.push({x: n.x, y: n.y, color: node.color});
+                            cell.waterColor = node.color; // purely visual 
+                            activeNodes.push({x: n.x, y: n.y, color: node.color, originX: node.x, originY: node.y});
                         }
                         else if (cell.type === 'AND_GATE') {
-                            cell.inputs.push(node.color);
-                            if (cell.inputs.length >= 2) {
-                                cell.waterColor = cell.inputs[0]; // Output first color
-                                activeNodes.push({x: n.x, y: n.y, color: cell.waterColor});
+                            cell.inputOrigins.add(`${node.originX},${node.originY}`);
+                            if(!cell.inputs.includes(node.color)) cell.inputs.push(node.color);
+                            
+                            // Needs inputs from at least 2 distinct adjacent cells
+                            if (cell.inputOrigins.size >= 2) {
+                                cell.waterColor = cell.inputs[0]; 
+                                activeNodes.push({x: n.x, y: n.y, color: cell.waterColor, originX: node.x, originY: node.y});
                             }
                         }
                         else if (cell.type === 'MIXER') {
                             if (!cell.inputs.includes(node.color)) cell.inputs.push(node.color);
                             if (cell.inputs.length >= 2) {
-                                let c1 = cell.inputs[0], c2 = cell.inputs[1];
-                                let mixed = this.mixColors(c1, c2);
+                                let mixed = this.mixColors(cell.inputs[0], cell.inputs[1]);
                                 cell.waterColor = mixed;
-                                activeNodes.push({x: n.x, y: n.y, color: mixed});
+                                activeNodes.push({x: n.x, y: n.y, color: mixed, originX: node.x, originY: node.y});
                             } else {
                                 cell.waterColor = cell.inputs[0];
                             }
@@ -269,6 +312,7 @@ class HydraGame {
     }
 
     mixColors(c1, c2) {
+        if(c1 === c2) return c1;
         const mix = {
             'blue+yellow': 'green', 'yellow+blue': 'green',
             'red+blue': 'purple', 'blue+red': 'purple',
@@ -294,11 +338,12 @@ class HydraGame {
                     this.playerStats.unlockedLevels = this.currentLevel.id + 1;
                 }
                 localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
+                this.updateUI();
                 
                 document.getElementById('win-xp').textContent = `+${xp} XP`;
                 document.getElementById('win-overlay').classList.remove('hidden');
                 document.getElementById('game-controls').classList.add('hidden');
-            }, 500);
+            }, 600);
         }
     }
 
@@ -323,7 +368,7 @@ class HydraGame {
 
     drawGridLines() {
         const { cols, rows } = this.currentLevel.gridSize;
-        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
         this.ctx.lineWidth = 1;
         
         for(let r = 0; r <= rows; r++) {
@@ -342,7 +387,7 @@ class HydraGame {
 
     drawPlacedComponents() {
         const s = this.cellSize;
-        const hw = s / 2; // half width
+        const hw = s / 2; 
         
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
@@ -352,13 +397,25 @@ class HydraGame {
                 const x = c * s;
                 const y = r * s;
                 
-                // Base component shape
+                if (cell.type === 'WALL') {
+                    this.ctx.fillStyle = "#1e293b";
+                    this.ctx.fillRect(x+1, y+1, s-2, s-2);
+                    
+                    // Simple pattern for wall
+                    this.ctx.strokeStyle = "#0f172a";
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y); this.ctx.lineTo(x+s, y+s);
+                    this.ctx.moveTo(x+s, y); this.ctx.lineTo(x, y+s);
+                    this.ctx.stroke();
+                    continue;
+                }
+
                 this.ctx.fillStyle = "rgba(50, 60, 80, 0.8)";
                 this.ctx.strokeStyle = "rgba(150, 160, 180, 0.5)";
                 this.ctx.lineWidth = 2;
                 
                 if (cell.type === 'PIPE') {
-                    // Draw a cross pipe
                     this.ctx.fillRect(x + s*0.25, y, s*0.5, s);
                     this.ctx.fillRect(x, y + s*0.25, s, s*0.5);
                     this.ctx.strokeRect(x + s*0.25, y, s*0.5, s);
@@ -370,20 +427,20 @@ class HydraGame {
                     this.ctx.fill();
                     this.ctx.stroke();
                     this.ctx.fillStyle = "#fff";
-                    this.ctx.font = "12px Arial";
+                    this.ctx.font = "bold 14px Arial";
                     this.ctx.textAlign = "center";
-                    this.ctx.fillText("&", x + hw, y + hw + 4);
+                    this.ctx.fillText("&", x + hw, y + hw + 5);
                 }
                 else if (cell.type === 'MIXER') {
                     this.ctx.fillRect(x + s*0.1, y + s*0.1, s*0.8, s*0.8);
                     this.ctx.strokeRect(x + s*0.1, y + s*0.1, s*0.8, s*0.8);
                     this.ctx.fillStyle = "#fff";
-                    this.ctx.font = "10px Arial";
+                    this.ctx.font = "bold 10px Arial";
                     this.ctx.textAlign = "center";
                     this.ctx.fillText("MIX", x + hw, y + hw + 3);
                 }
 
-                // Draw Water Flow
+                // Water Flow Overlay
                 if (cell.waterColor) {
                     this.ctx.fillStyle = this.colorMap[cell.waterColor];
                     if (cell.type === 'PIPE') {
@@ -394,7 +451,7 @@ class HydraGame {
                         this.ctx.arc(x + hw, y + hw, s*0.2, 0, Math.PI * 2);
                         this.ctx.fill();
                     } else if (cell.type === 'MIXER') {
-                        this.ctx.fillRect(x + s*0.3, y + s*0.3, s*0.4, s*0.4);
+                        this.ctx.fillRect(x + s*0.25, y + s*0.25, s*0.5, s*0.5);
                     }
                 }
             }
@@ -409,31 +466,31 @@ class HydraGame {
             const x = source.x * s;
             const y = source.y * s;
             
-            // Draw Source tank
             this.ctx.fillStyle = this.colorMap[source.color];
-            this.ctx.shadowBlur = 15;
+            this.ctx.shadowBlur = 10;
             this.ctx.shadowColor = this.colorMap[source.color];
             this.ctx.beginPath();
-            this.ctx.arc(x + hw, y + hw, s*0.4, 0, Math.PI * 2);
+            this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.shadowBlur = 0; // reset
+            this.ctx.shadowBlur = 0; 
             
-            // Output pipe right
-            this.ctx.fillRect(x + hw, y + s*0.35, hw, s*0.3);
+            // Draw a small nozzle
+            this.ctx.fillStyle = "#94a3b8";
+            this.ctx.fillRect(x + hw - 4, y + hw - 4, 8, 8);
         });
 
         this.currentLevel.targets.forEach(target => {
             const x = target.x * s;
             const y = target.y * s;
             
-            // Target outline
             this.ctx.strokeStyle = this.colorMap[target.requiredColor];
             this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([5, 5]);
             this.ctx.beginPath();
             this.ctx.arc(x + hw, y + hw, s*0.4, 0, Math.PI * 2);
             this.ctx.stroke();
+            this.ctx.setLineDash([]); // reset
 
-            // Fill if flowing
             if (target.currentFlow) {
                 this.ctx.fillStyle = this.colorMap[target.currentFlow];
                 this.ctx.beginPath();
