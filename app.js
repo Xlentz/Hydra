@@ -66,7 +66,7 @@ class HydraGame {
         this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
-            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, unlockedLevels: 1, audio: true, colorblind: false
+            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, unlockedLevels: 100, audio: true, colorblind: false // All unlocked
         };
         this.audio.enabled = this.playerStats.audio;
 
@@ -140,9 +140,6 @@ class HydraGame {
             setEl('click-counter', this.clicks);
             setEl('par-clicks', this.currentLevel.parClicks || 10);
         }
-
-        const unlocked = this.playerStats.unlockedLevels;
-        const a1 = document.getElementById('ach-1'); if(a1 && unlocked > 1) a1.classList.add('unlocked');
         
         const audioBtn = document.getElementById('toggle-audio');
         const audioKnob = document.getElementById('audio-knob');
@@ -166,12 +163,10 @@ class HydraGame {
         grid.innerHTML = '';
         HYDRA_LEVELS.forEach((level, index) => {
             const btn = document.createElement('button');
-            const isLocked = index + 1 > this.playerStats.unlockedLevels;
-            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all ${
-                isLocked ? 'bg-slate-800 text-slate-600 border border-slate-700 opacity-50' : 'bg-slate-800 text-cyan-100 hover:bg-cyan-900 shadow-lg border border-cyan-500/50'
-            }`;
+            // FIX: Removed locked levels, everything is available for testing and playing
+            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all bg-slate-800 text-cyan-100 hover:bg-cyan-900 shadow-lg border border-cyan-500/50`;
             btn.innerHTML = `<span class="text-xl">${level.id}</span>`;
-            if (!isLocked) btn.onclick = () => this.startLevel(index);
+            btn.onclick = () => this.startLevel(index);
             grid.appendChild(btn);
         });
     }
@@ -416,14 +411,14 @@ class HydraGame {
                 if(cell.type === 'VALVE') inv.valves++;
                 this.grid[y][x] = null;
                 this.audio.playClick();
-                this.clicks++;
+                this.clicks--; // Refund click on delete
             }
         } else {
             if (cell) {
                 if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
                     cell.rotation = (cell.rotation + 1) % 4;
                     this.audio.playClick();
-                    this.clicks++;
+                    // FIX: No this.clicks++ for rotating anymore! Only placing tiles counts.
                 }
             } else {
                 let p = false;
@@ -440,6 +435,7 @@ class HydraGame {
             }
         }
         
+        if (this.clicks < 0) this.clicks = 0;
         this.updateUI();
         this.calculateFlow(true); 
     }
@@ -521,7 +517,11 @@ class HydraGame {
                 }
             }
 
-            let splitOutIndex = 0; // FIX: Keeps track of which split color goes to which output
+            // FIX: Splitter Logic Rewrite. Evaluate available colors outside the loop
+            let availableColors = null;
+            if (node.color === 'split_trigger') {
+                availableColors = [...node.colors];
+            }
 
             DIRS.forEach(move => {
                 if (node.fromDir !== null && move.d === (node.fromDir + 2) % 4) return; 
@@ -530,6 +530,12 @@ class HydraGame {
                     if (move.d !== node.fromDir) return; 
                 }
                 
+                let emitColor = node.color;
+                if (node.color === 'split_trigger') {
+                    if (availableColors.length === 0) return; // Out of colors to emit
+                    emitColor = availableColors[0];
+                }
+
                 if (currentCell && currentCell.type === 'VALVE') {
                     let r = currentCell.rotation || 0;
                     let inline = (r%2===0) ? [1,3] : [0,2];
@@ -548,20 +554,18 @@ class HydraGame {
                 if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
                     if (!this.canConnect(node.x, node.y, nx, ny, move.d)) return;
 
-                    let emitColor = node.color;
-                    
-                    // FIX: Dynamically assign split colors to the first two valid connected pipes
-                    if (node.color === 'split_trigger') {
-                        emitColor = node.colors[splitOutIndex % 2];
-                        splitOutIndex++;
-                        // Save to Splitter for rendering
-                        if(splitOutIndex === 1) currentCell.flows['out1_rendered'] = emitColor;
-                        if(splitOutIndex === 2) currentCell.flows['out2_rendered'] = emitColor;
-                    }
+                    const consumeSplit = () => {
+                        if (node.color === 'split_trigger') {
+                            let consumed = availableColors.shift();
+                            if(availableColors.length === 1) currentCell.flows['out1_rendered'] = consumed;
+                            if(availableColors.length === 0) currentCell.flows['out2_rendered'] = consumed;
+                        }
+                    };
 
                     let target = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
                     if (target) {
                         target.currentFlow = emitColor;
+                        consumeSplit();
                         return; 
                     }
 
@@ -572,6 +576,7 @@ class HydraGame {
                         if (cell.type.startsWith('PIPE') || cell.type === 'PORTAL') {
                             cell.flows[move.d] = emitColor; 
                             queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
+                            consumeSplit();
                         }
                         else if (cell.type === 'VALVE') {
                             cell.flows[move.d] = emitColor;
@@ -580,6 +585,7 @@ class HydraGame {
                             if(inline.includes(move.d)) {
                                 queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
                             }
+                            consumeSplit();
                         }
                         else if (cell.type === 'AND_GATE') {
                             cell.inputOrigins.add(move.d);
@@ -589,6 +595,7 @@ class HydraGame {
                                 cell.flows['out'] = cell.inputs[0]; 
                                 queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: null});
                             }
+                            consumeSplit();
                         }
                         else if (cell.type === 'MIXER') {
                             cell.inputOrigins.add(move.d);
@@ -601,16 +608,17 @@ class HydraGame {
                             } else {
                                 cell.flows['out'] = cell.inputs[0];
                             }
+                            consumeSplit();
                         }
                         else if (cell.type === 'SPLITTER') {
                             cell.inputOrigins.add(move.d);
                             let unmix = this.unmixColor(emitColor);
                             if(unmix.length === 2) {
-                                // Push the trigger instead of standard color
                                 queue.push({x: nx, y: ny, color: 'split_trigger', colors: unmix, fromDir: move.d});
                             } else {
                                 queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
                             }
+                            consumeSplit();
                         }
                     }
                 }
@@ -873,7 +881,6 @@ class HydraGame {
                         this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.stroke();
                         this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 10px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("SPLIT", 0, s*0.2);
                         
-                        // FIX: Show the two correctly assigned colors
                         if(cell.flows && (!this.isFlowing || this.flowAnimationProgress > 60)) {
                             if(cell.flows['out1_rendered']) {
                                 this.ctx.fillStyle = this.colorMap[cell.flows['out1_rendered']];
