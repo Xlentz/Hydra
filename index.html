@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hydra-Logic | PWA Puzzle</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="icon" type="image/png" href="logo.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* Dunkelblau aus dem Logo-Hintergrund */
+            color: #f1f5f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Verhindert Scrolling der gesamten Seite auf Mobile */
+        }
+        .glass-effect {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #game-canvas {
+            touch-action: none; /* Wichtig für flüssige Bedienung auf Touchscreens */
+            background-image: 
+                radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <header class="p-4 glass-effect flex justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <img src="logo.png" alt="Hydra-Logic Logo" class="w-10 h-10 rounded-lg shadow-lg shadow-cyan-500/20">
+            <div>
+                <h1 class="text-lg font-bold leading-none bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                    HYDRA-LOGIC
+                </h1>
+                <p id="player-name" class="text-xs text-slate-400">Gast-Techniker</p>
+            </div>
+        </div>
+        
+        <div class="flex gap-4 items-center">
+            <div class="text-right">
+                <div class="flex items-center gap-1 justify-end">
+                    <span id="player-stars" class="font-bold text-yellow-400">0</span>
+                    <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                </div>
+                <div class="text-[10px] text-slate-400"><span id="player-xp">0</span> XP</div>
+            </div>
+            <button id="menu-btn" class="p-2 hover:bg-slate-700 rounded-full transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow relative overflow-hidden bg-slate-900">
+        <canvas id="game-canvas" class="w-full h-full"></canvas>
+
+        <div id="level-selection" class="absolute inset-0 z-20 bg-slate-950/90 flex flex-col items-center justify-center p-6 transition-all duration-500">
+            <h2 class="text-2xl font-light mb-8 tracking-widest text-cyan-200 uppercase">Wähle eine Mission</h2>
+            <div id="level-grid" class="grid grid-cols-4 gap-4 max-w-md w-full">
+                </div>
+        </div>
+
+        <div id="game-controls" class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 glass-effect p-3 rounded-2xl hidden">
+            <button id="btn-reset" class="p-3 bg-slate-800 rounded-xl hover:bg-slate-700">
+                <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+            <button id="btn-play" class="px-8 py-3 bg-gradient-to-r from-cyan-600 to-emerald-600 rounded-xl font-bold uppercase tracking-wider hover:scale-105 active:scale-95 transition-transform">
+                Starten
+            </button>
+        </div>
+    </main>
+
+    <footer class="px-4 py-2 text-[10px] text-slate-500 flex justify-between border-t border-slate-800">
+        <span>v1.0.0 Alpha</span>
+        <span id="level-title text-cyan-400 font-bold uppercase">Kein Level geladen</span>
+    </footer>
+
+    <script src="levels.js"></script>
+    <script src="app.js"></script>
+
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registriert!'))
+                    .catch(err => console.log('SW Fehler:', err));
+            });
+        }
+    </script>
+</body>
+</html>
