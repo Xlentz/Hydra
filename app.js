@@ -1,11 +1,11 @@
 /**
  * HYDRA-LOGIC CORE ENGINE
- * Fokus: Gestochen scharfe Canvas-Skalierung, stabile Fluss-Simulation & sauberer Audiokontext
+ * Fokus: Gestochen scharfe Canvas-Skalierung, High-End Lichteffekte & Reparierte Avatar-Auswahl
  */
 
 class AudioEngine {
     constructor() {
-        this.ctx = null; // Erst bei Benutzerinteraktion initialisieren (iOS Safe)
+        this.ctx = null;
         this.enabled = true;
     }
     
@@ -50,7 +50,7 @@ class AudioEngine {
     playWin() {
         this.initContext();
         if (!this.enabled || !this.ctx || this.ctx.state === 'suspended') return;
-        const notes = [523.25, 659.25, 783.99, 1046.50]; // Edler C-Dur Akkord (C5, E5, G5, C6)
+        const notes = [523.25, 659.25, 783.99, 1046.50]; 
         notes.forEach((freq, i) => {
             const osc = this.ctx.createOscillator(); 
             const gain = this.ctx.createGain();
@@ -82,27 +82,34 @@ class HydraGame {
         this.isFlowing = false;
         this.clicks = 0;
         this.flowAnimationProgress = 0; 
+        this.animationTime = 0; 
         
-        // Intensivere Cyberpunk/Dark-Mode Farbpalette
+        // Die 15 Wunsch-Avatare
+        this.avatars = ["🐭","👻","👽","👨🏻‍💼","🥷🏼","🧙🏻","👩🏻‍💼","🦊","🐵","🐶","🦁","🐯","🐰","🐙","⚽️"];
+        this.selectedAvatarTemp = "🐭"; 
+        
         this.colorMap = { 
-            'blue': '#38bdf8',   // Neon Cyan
-            'yellow': '#facc15', // Vibrant Yellow
-            'red': '#f87171',    // Laser Red
-            'green': '#4ade80',  // Emerald Green
-            'purple': '#c084fc', // Electric Purple
-            'orange': '#fb923c'  // Intense Orange
+            'blue': '#06b6d4',   // Neon Cyan
+            'yellow': '#eab308', // Vibrant Gold
+            'red': '#ef4444',    // Laser Red
+            'green': '#10b981',  // Emerald Green
+            'purple': '#a855f7', // Electric Purple
+            'orange': '#f97316'  // Intense Orange
         };
-        this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
-            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
+            name: "Techniker", avatar: "🐭", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
         };
+        
+        if (!this.avatars.includes(this.playerStats.avatar)) {
+            this.playerStats.avatar = "🐭";
+        }
+        this.selectedAvatarTemp = this.playerStats.avatar;
         this.audio.enabled = this.playerStats.audio;
 
         this.init();
         window.addEventListener('resize', () => this.resize());
         
-        // Universelles Interaktions-Trigger-Event zum Freischalten von Audio
         const unlockAudio = () => {
             this.audio.initContext();
             document.body.removeEventListener('click', unlockAudio);
@@ -115,14 +122,38 @@ class HydraGame {
     init() {
         this.resize();
         this.renderLevelList();
+        this.buildAvatarGrid();
         this.setupEventListeners();
         requestAnimationFrame(() => this.gameLoop());
         this.updateUI(); 
     }
 
-    /**
-     * Behebt Unschärfen auf Retina/High-DPI Bildschirmen
-     */
+    buildAvatarGrid() {
+        const container = document.getElementById('avatar-container');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        this.avatars.forEach(av => {
+            const btn = document.createElement('button');
+            btn.dataset.avatar = av;
+            btn.className = "avatar-btn h-12 rounded-xl border border-slate-700 text-2xl flex items-center justify-center hover:bg-slate-800 transition-all";
+            btn.textContent = av;
+            
+            if (av === this.selectedAvatarTemp) {
+                btn.classList.add('selected');
+            }
+            
+            btn.onclick = (e) => {
+                document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+                e.currentTarget.classList.add('selected');
+                this.selectedAvatarTemp = av;
+                this.audio.playClick();
+            };
+            
+            container.appendChild(btn);
+        });
+    }
+
     resize() {
         const dpr = window.devicePixelRatio || 1;
         const rect = this.canvas.parentElement.getBoundingClientRect();
@@ -137,7 +168,7 @@ class HydraGame {
         if (this.currentLevel) {
             const { cols, rows } = this.currentLevel.gridSize;
             this.cellSize = Math.min(rect.width / (cols + 1), rect.height / (rows + 3));
-            if (this.cellSize > 70) this.cellSize = 70;
+            if (this.cellSize > 75) this.cellSize = 75;
             this.centerGrid(rect.width, rect.height);
         }
     }
@@ -155,6 +186,7 @@ class HydraGame {
         
         setEl('player-name', this.playerStats.name);
         setEl('header-avatar', this.playerStats.avatar);
+        setEl('btn-open-profile', this.playerStats.avatar);
         setEl('player-xp', this.playerStats.xp);
         setEl('player-stars', this.playerStats.stars);
         
@@ -249,22 +281,15 @@ class HydraGame {
 
     setupEventListeners() {
         const modal = document.getElementById('profile-modal');
-        let selectedAvatarTemp = this.playerStats.avatar;
 
         document.getElementById('btn-open-profile').onclick = () => {
             document.getElementById('input-player-name').value = this.playerStats.name;
             document.getElementById('modal-xp').textContent = this.playerStats.xp + ' XP';
             document.getElementById('modal-stars').textContent = this.playerStats.stars;
             
-            document.querySelectorAll('.avatar-btn').forEach(btn => {
-                btn.classList.toggle('selected', btn.dataset.avatar === this.playerStats.avatar);
-                btn.onclick = (e) => {
-                    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
-                    e.currentTarget.classList.add('selected');
-                    selectedAvatarTemp = e.currentTarget.dataset.avatar;
-                };
-            });
-            this.updateUI();
+            this.selectedAvatarTemp = this.playerStats.avatar;
+            this.buildAvatarGrid();
+            
             modal.classList.remove('hidden');
         };
         
@@ -273,7 +298,8 @@ class HydraGame {
         document.getElementById('btn-save-profile').onclick = () => {
             const nameInput = document.getElementById('input-player-name').value.trim();
             if(nameInput) this.playerStats.name = nameInput;
-            this.playerStats.avatar = selectedAvatarTemp;
+            
+            this.playerStats.avatar = this.selectedAvatarTemp;
             localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
             this.updateUI();
             modal.classList.add('hidden');
@@ -317,7 +343,7 @@ class HydraGame {
             
             this.flowAnimationProgress = 0;
             const animInterval = setInterval(() => {
-                this.flowAnimationProgress += 4;
+                this.flowAnimationProgress += 3;
                 if(this.flowAnimationProgress >= 100) {
                     clearInterval(animInterval);
                     this.checkWinCondition();
@@ -603,6 +629,8 @@ class HydraGame {
         const h = parseFloat(this.canvas.style.height);
         this.ctx.clearRect(0, 0, w, h);
         
+        this.animationTime += 0.05; 
+        
         if (this.currentLevel) {
             this.ctx.save();
             this.ctx.translate(this.offsetX, this.offsetY);
@@ -615,8 +643,8 @@ class HydraGame {
     drawCB(x, y, color) {
         if(!this.playerStats.colorblind || !color) return;
         this.ctx.save();
-        this.ctx.strokeStyle = "rgba(15,23,42,0.6)"; this.ctx.lineWidth = 1.5;
-        this.ctx.font = "bold 9px sans-serif"; this.ctx.textAlign = "center"; this.ctx.textBaseline = "middle";
+        this.ctx.strokeStyle = "rgba(15,23,42,0.8)"; this.ctx.lineWidth = 2;
+        this.ctx.font = "bold 10px monospace"; this.ctx.textAlign = "center"; this.ctx.textBaseline = "middle";
         let letter = color.charAt(0).toUpperCase();
         this.ctx.strokeText(letter, x, y);
         this.ctx.fillStyle = "#ffffff";
@@ -624,11 +652,29 @@ class HydraGame {
         this.ctx.restore();
     }
 
+    drawFlowParticles(startX, startY, endX, endY, color) {
+        if (!this.isFlowing) return;
+        this.ctx.save();
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.shadowBlur = 8;
+        this.ctx.shadowColor = color;
+        
+        for (let i = 0; i < 3; i++) {
+            let offset = (this.animationTime * 0.3 + i * 0.33) % 1.0;
+            let px = startX + (endX - startX) * offset;
+            let py = startY + (endY - startY) * offset;
+            this.ctx.beginPath();
+            this.ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        this.ctx.restore();
+    }
+
     drawGrid() {
         const { cols, rows } = this.currentLevel.gridSize;
         const s = this.cellSize;
         
-        this.ctx.strokeStyle = "rgba(51, 65, 85, 0.25)";
+        this.ctx.strokeStyle = "rgba(51, 65, 85, 0.15)";
         this.ctx.lineWidth = 1;
         for (let c = 0; c <= cols; c++) {
             this.ctx.beginPath(); this.ctx.moveTo(c*s, 0); this.ctx.lineTo(c*s, rows*s); this.ctx.stroke();
@@ -638,23 +684,52 @@ class HydraGame {
         }
 
         this.currentLevel.sources.forEach(src => {
-            this.ctx.fillStyle = this.colorMap[src.color] || "#ffffff";
+            let baseColor = this.colorMap[src.color] || "#ffffff";
+            let pulse = Math.sin(this.animationTime * 2) * 3;
+            
             this.ctx.save();
-            this.ctx.shadowBlur = 12; this.ctx.shadowColor = this.ctx.fillStyle;
-            this.ctx.fillRect(src.x*s + s*0.15, src.y*s + s*0.15, s*0.7, s*0.7);
+            this.ctx.strokeStyle = baseColor;
+            this.ctx.lineWidth = 2;
+            this.ctx.shadowBlur = 10 + pulse;
+            this.ctx.shadowColor = baseColor;
+            this.ctx.strokeRect(src.x*s + s*0.1, src.y*s + s*0.1, s*0.8, s*0.8);
+            
+            this.ctx.fillStyle = baseColor;
+            this.ctx.fillRect(src.x*s + s*0.25, src.y*s + s*0.25, s*0.5, s*0.5);
             this.ctx.restore();
+            
             this.drawCB(src.x*s+s*0.5, src.y*s+s*0.5, src.color);
         });
 
         this.currentLevel.targets.forEach(tgt => {
-            this.ctx.strokeStyle = this.colorMap[tgt.requiredColor] || "#ffffff";
-            this.ctx.lineWidth = 3;
-            this.ctx.strokeRect(tgt.x*s + s*0.2, tgt.y*s + s*0.2, s*0.6, s*0.6);
+            let baseColor = this.colorMap[tgt.requiredColor] || "#ffffff";
+            
+            this.ctx.save();
+            this.ctx.strokeStyle = baseColor;
+            this.ctx.lineWidth = 2;
+            
+            let tx = tgt.x * s; let ty = tgt.y * s;
+            let d = s * 0.15;
+            this.ctx.beginPath(); this.ctx.moveTo(tx+d, ty+d+10); this.ctx.lineTo(tx+d, ty+d); this.ctx.lineTo(tx+d+10, ty+d); this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(tx+s-d, ty+d+10); this.ctx.lineTo(tx+s-d, ty+d); this.ctx.lineTo(tx+s-d-10, ty+d); this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(tx+d, ty+s-d-10); this.ctx.lineTo(tx+d, ty+s-d); this.ctx.lineTo(tx+d+10, ty+s-d); this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(tx+s-d, ty+s-d-10); this.ctx.lineTo(tx+s-d, ty+s-d); this.ctx.lineTo(tx+s-d-10, ty+s-d); this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.arc(tx + s*0.5, ty + s*0.5, s*0.2, 0, Math.PI*2);
+            this.ctx.stroke();
+
             if(tgt.currentFlow) {
-                this.ctx.fillStyle = this.colorMap[tgt.currentFlow];
-                this.ctx.fillRect(tgt.x*s + s*0.3, tgt.y*s + s*0.3, s*0.4, s*0.4);
-                this.drawCB(tgt.x*s+s*0.5, tgt.y*s+s*0.5, tgt.currentFlow);
+                let currentHex = this.colorMap[tgt.currentFlow];
+                this.ctx.fillStyle = currentHex;
+                this.ctx.shadowBlur = 15;
+                this.ctx.shadowColor = currentHex;
+                this.ctx.beginPath();
+                this.ctx.arc(tx + s*0.5, ty + s*0.5, s*0.15, 0, Math.PI*2);
+                this.ctx.fill();
+                this.drawCB(tx+s*0.5, ty+s*0.5, tgt.currentFlow);
             }
+            this.ctx.restore();
         });
 
         for (let r = 0; r < rows; r++) {
@@ -666,50 +741,83 @@ class HydraGame {
                 this.ctx.translate(c*s + s*0.5, r*s + s*0.5);
 
                 if (cell.type === 'WALL') {
-                    this.ctx.fillStyle = "#334155";
-                    this.ctx.fillRect(-s*0.4, -s*0.4, s*0.8, s*0.8);
+                    this.ctx.fillStyle = "#1e293b";
+                    this.ctx.strokeStyle = "#334155";
+                    this.ctx.lineWidth = 2;
+                    this.ctx.fillRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
+                    this.ctx.strokeRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
+                    
+                    this.ctx.fillStyle = "#475569";
+                    this.ctx.fillRect(-s*0.1, -s*0.1, s*0.2, s*0.2);
                 } 
                 else if (cell.type.startsWith('PIPE_')) {
                     this.ctx.rotate((cell.rotation || 0) * Math.PI / 2);
-                    this.ctx.strokeStyle = "#475569"; this.ctx.lineWidth = 8;
                     
+                    this.ctx.strokeStyle = "#334155"; this.ctx.lineWidth = 14; this.ctx.lineCap = "round";
                     if (cell.type === 'PIPE_STRAIGHT') {
                         this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
-                        if (cell.flows) {
+                    } else if (cell.type === 'PIPE_ANGLE') {
+                        this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.quadraticCurveTo(0,0, s*0.5, 0); this.ctx.stroke();
+                    } else if (cell.type === 'PIPE_CROSS') {
+                        this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
+                        this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.lineTo(0, s*0.5); this.ctx.stroke();
+                    }
+
+                    this.ctx.strokeStyle = "#1e293b"; this.ctx.lineWidth = 6;
+                    if (cell.type === 'PIPE_STRAIGHT') {
+                        this.ctx.stroke();
+                    } else if (cell.type === 'PIPE_ANGLE') {
+                        this.ctx.stroke();
+                    } else if (cell.type === 'PIPE_CROSS') {
+                        this.ctx.stroke();
+                    }
+
+                    if (cell.flows) {
+                        if (cell.type === 'PIPE_STRAIGHT') {
                             [1,3].forEach(d => {
                                 let f = cell.flows[d];
                                 if(f && (!this.isFlowing || this.flowAnimationProgress > 0)) {
-                                    this.ctx.strokeStyle = this.colorMap[f]; this.ctx.lineWidth = 4;
+                                    let hex = this.colorMap[f];
+                                    this.ctx.save();
+                                    this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6;
+                                    this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
                                     this.ctx.beginPath(); this.ctx.moveTo(d===3?-s*0.5:0, 0); this.ctx.lineTo(d===1?s*0.5:0, 0); this.ctx.stroke();
+                                    this.ctx.restore();
+                                    
+                                    this.drawFlowParticles(d===3?-s*0.5:0, 0, d===1?s*0.5:0, 0, hex);
                                     this.drawCB(d===3?-s*0.25:s*0.25, 0, f);
                                 }
                             });
-                        }
-                    } 
-                    else if (cell.type === 'PIPE_ANGLE') {
-                        this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.quadraticCurveTo(0,0, s*0.5, 0); this.ctx.stroke();
-                        if(cell.flows) {
+                        } 
+                        else if (cell.type === 'PIPE_ANGLE') {
                             if(cell.flows[0]) {
-                                this.ctx.strokeStyle = this.colorMap[cell.flows[0]]; this.ctx.lineWidth = 4;
+                                let hex = this.colorMap[cell.flows[0]];
+                                this.ctx.save();
+                                this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6; this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
                                 this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.quadraticCurveTo(0,0, s*0.2, 0); this.ctx.stroke();
+                                this.ctx.restore();
                                 this.drawCB(0, -s*0.25, cell.flows[0]);
                             }
                             if(cell.flows[1]) {
-                                this.ctx.strokeStyle = this.colorMap[cell.flows[1]]; this.ctx.lineWidth = 4;
+                                let hex = this.colorMap[cell.flows[1]];
+                                this.ctx.save();
+                                this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6; this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
                                 this.ctx.beginPath(); this.ctx.moveTo(s*0.5, 0); this.ctx.quadraticCurveTo(0,0, 0, -s*0.2); this.ctx.stroke();
+                                this.ctx.restore();
                                 this.drawCB(s*0.25, 0, cell.flows[1]);
                             }
-                        }
-                    } 
-                    else if (cell.type === 'PIPE_CROSS') {
-                        this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
-                        this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.lineTo(0, s*0.5); this.ctx.stroke();
-                        if(cell.flows) {
+                        } 
+                        else if (cell.type === 'PIPE_CROSS') {
                             const DIRS = [{dx:-s*0.5, dy:0, d:3}, {dx:s*0.5, dy:0, d:1}, {dx:0, dy:-s*0.5, d:0}, {dx:0, dy:s*0.5, d:2}];
                             DIRS.forEach(dr => {
                                 if(cell.flows[dr.d]) {
-                                    this.ctx.strokeStyle = this.colorMap[dr.d]; this.ctx.lineWidth = 4;
+                                    let hex = this.colorMap[dr.d];
+                                    this.ctx.save();
+                                    this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6;
+                                    this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
                                     this.ctx.beginPath(); this.ctx.moveTo(0,0); this.ctx.lineTo(dr.dx, dr.dy); this.ctx.stroke();
+                                    this.ctx.restore();
+                                    this.drawFlowParticles(0, 0, dr.dx, dr.dy, hex);
                                     this.drawCB(dr.dx*0.5, dr.dy*0.5, cell.flows[dr.d]);
                                 }
                             });
@@ -717,51 +825,48 @@ class HydraGame {
                     }
                 } 
                 else if (cell.type === 'AND_GATE' || cell.type === 'MIXER' || cell.type === 'SPLITTER') {
-                    this.ctx.fillStyle = "#1e293b"; this.ctx.strokeStyle = "#64748b"; this.ctx.lineWidth = 2;
-                    this.ctx.fillRect(-s*0.4, -s*0.4, s*0.8, s*0.8); this.ctx.strokeRect(-s*0.4, -s*0.4, s*0.8, s*0.8);
+                    this.ctx.fillStyle = "#0f172a"; this.ctx.strokeStyle = "#475569"; this.ctx.lineWidth = 2;
+                    this.ctx.fillRect(-s*0.38, -s*0.38, s*0.76, s*0.76); this.ctx.strokeRect(-s*0.38, -s*0.38, s*0.76, s*0.76);
                     
-                    this.ctx.fillStyle = cell.type==='AND_GATE'?'#f87171':cell.type==='MIXER'?'#c084fc':'#fb923c';
-                    this.ctx.font = "bold 9px monospace"; this.ctx.textAlign = "center";
+                    let gateColor = cell.type==='AND_GATE'?'#ef4444':cell.type==='MIXER'?'#a855f7':'#f97316';
+                    this.ctx.fillStyle = gateColor;
+                    this.ctx.font = "bold 10px monospace"; this.ctx.textAlign = "center";
                     this.ctx.fillText(cell.type==='AND_GATE'?'AND':cell.type==='MIXER'?'MIX':'SPLIT', 0, 3);
                     
                     if(cell.flows && cell.flows['out'] && (!this.isFlowing || this.flowAnimationProgress > 40)) {
-                        this.ctx.fillStyle = this.colorMap[cell.flows['out']];
-                        this.ctx.beginPath(); this.ctx.arc(0, 0, 6, 0, Math.PI*2); this.ctx.fill();
+                        let hex = this.colorMap[cell.flows['out']];
+                        this.ctx.save();
+                        this.ctx.fillStyle = hex; this.ctx.shadowBlur = 12; this.ctx.shadowColor = hex;
+                        this.ctx.beginPath(); this.ctx.arc(0, 0, 7, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.restore();
                         this.drawCB(0, 0, cell.flows['out']);
-                    }
-                    if(cell.type === 'SPLITTER' && cell.flows) {
-                        if(cell.flows['out1_rendered']) {
-                            this.ctx.fillStyle = this.colorMap[cell.flows['out1_rendered']];
-                            this.ctx.beginPath(); this.ctx.arc(-s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
-                            this.drawCB(-s*0.15, s*0.15, cell.flows['out1_rendered']);
-                        }
-                        if(cell.flows['out2_rendered']) {
-                            this.ctx.fillStyle = this.colorMap[cell.flows['out2_rendered']];
-                            this.ctx.beginPath(); this.ctx.arc(s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
-                            this.drawCB(s*0.15, s*0.15, cell.flows['out2_rendered']);
-                        }
                     }
                 }
                 else if (cell.type === 'PORTAL') {
-                    this.ctx.fillStyle = "#a855f7";
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.4, 0, Math.PI*2); this.ctx.fill();
-                    this.ctx.fillStyle = "#1e293b";
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.3, 0, Math.PI*2); this.ctx.fill();
+                    let spin = this.animationTime * 0.5;
+                    this.ctx.strokeStyle = "#d946ef"; this.ctx.lineWidth = 3;
+                    this.ctx.save();
+                    this.ctx.rotate(spin);
+                    this.ctx.strokeRect(-s*0.25, -s*0.25, s*0.5, s*0.5);
+                    this.ctx.restore();
                     
                     if(cell.flows && Object.keys(cell.flows).length > 0 && (!this.isFlowing || this.flowAnimationProgress > 30)) {
                         let c = Object.values(cell.flows)[0];
-                        this.ctx.fillStyle = this.colorMap[c];
-                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI*2); this.ctx.fill();
+                        let hex = this.colorMap[c];
+                        this.ctx.save();
+                        this.ctx.fillStyle = hex; this.ctx.shadowBlur = 15; this.ctx.shadowColor = hex;
+                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.18, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.restore();
                         this.drawCB(0, 0, c);
                     }
                 }
                 else if (cell.type === 'VALVE') {
                     this.ctx.rotate((cell.rotation || 0) * Math.PI / 2);
-                    this.ctx.strokeStyle = "#475569"; this.ctx.lineWidth = 6;
-                    this.ctx.beginPath(); this.ctx.moveTo(-s*0.4, 0); this.ctx.lineTo(s*0.4, 0); this.ctx.stroke();
+                    this.ctx.strokeStyle = "#64748b"; this.ctx.lineWidth = 6;
+                    this.ctx.beginPath(); this.ctx.moveTo(-s*0.35, 0); this.ctx.lineTo(s*0.35, 0); this.ctx.stroke();
                     
-                    this.ctx.fillStyle = "#f59e0b";
-                    this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.25); this.ctx.lineTo(s*0.2, s*0.15); this.ctx.lineTo(-s*0.2, s*0.15); this.ctx.closePath(); this.ctx.fill();
+                    this.ctx.fillStyle = "#fbbf24";
+                    this.ctx.fillRect(-4, -s*0.2, 8, s*0.4);
                 }
 
                 this.ctx.restore();
@@ -774,27 +879,19 @@ class HydraGame {
 window.addEventListener('DOMContentLoaded', () => {
     window.gameInstance = new HydraGame();
 
-    // Registrierung des Service Workers mit Prüfung auf Updates
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').then(reg => {
-            console.log('[PWA] Service Worker registriert.');
-
-            // Prüft im Hintergrund aktiv auf Updates, wenn die App gestartet wird
             reg.update();
-
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
-                    // Sobald der neue Service Worker installiert ist, laden wir die App neu
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('[PWA] Neue Version entdeckt! Führe Auto-Update aus...');
                         window.location.reload();
                     }
                 });
             });
         }).catch(err => console.error('[PWA] SW-Registrierung fehlgeschlagen:', err));
         
-        // Verhindert Endlosschleifen beim Reload
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydra-logic-v5'; // Version erhöht für sauberen Übergang
+const CACHE_NAME = 'hydra-logic-v6'; // Version erhöht für sofortiges Zwangs-Update!
 const ASSETS = [
   './',
   './index.html',
@@ -15,11 +15,10 @@ self.addEventListener('install', event => {
       return cache.addAll(ASSETS);
     })
   );
-  // Zwingt den einziehenden Service Worker, sofort aktiv zu werden
   self.skipWaiting();
 });
 
-// Alten Cache aufräumen, falls sich der CACHE_NAME ändert
+// Alten Cache aufräumen
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -33,13 +32,11 @@ self.addEventListener('activate', event => {
       );
     })
   );
-  // Sorgt dafür, dass geöffnete Tabs sofort kontrolliert werden
   return self.clients.claim();
 });
 
-// Strategie: Stale-While-Revalidate (Schneller Start + Hintergrund-Update)
+// Strategie: Stale-While-Revalidate
 self.addEventListener('fetch', event => {
-  // Nur HTTP(S) Anfragen cachen (schließt Browser-Erweiterungen aus)
   if (!event.request.url.startsWith(self.location.origin) && !event.request.url.startsWith('https://cdn.tailwindcss.com')) {
     return;
   }
@@ -47,18 +44,13 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.open(CACHE_NAME).then(cache => {
       return cache.match(event.request).then(cachedResponse => {
-        // Netzwerk-Anfrage parallel starten
         const fetchPromise = fetch(event.request).then(networkResponse => {
-          // Wenn die Antwort gültig ist, den Cache aktualisieren
           if (networkResponse && networkResponse.status === 200) {
             cache.put(event.request, networkResponse.clone());
           }
           return networkResponse;
-        }).catch(() => {
-          // Offline-Fallback: Wenn Netzwerk fehlschlägt, ist das nicht schlimm
-        });
+        }).catch(() => {});
 
-        // Sofort die gecachte Version zurückgeben (falls vorhanden), ansonsten auf das Netzwerk warten
         return cachedResponse || fetchPromise;
       });
     })
