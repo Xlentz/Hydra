@@ -9,154 +9,132 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; touch-action: none; }
-        .glass-effect { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        #game-canvas { background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50px 50px; }
+        .glass-effect { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.08); }
+        #game-canvas { background-image: radial-gradient(circle at 1px 1px, rgba(56, 189, 248, 0.1) 1px, transparent 0); background-size: 30px 30px; }
         .tool-btn.active { background-color: #0891b2; border-color: #22d3ee; transform: scale(1.05); }
         .avatar-btn.selected { border-color: #22d3ee; background-color: rgba(34, 211, 238, 0.2); }
-        .star-icon { color: #475569; transition: color 0.3s; }
-        .star-icon.filled { color: #eab308; filter: drop-shadow(0 0 5px rgba(234, 179, 8, 0.5)); }
-        ::-webkit-scrollbar { height: 6px; width: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.5); border-radius: 10px; }
     </style>
 </head>
-<body class="h-screen flex flex-col relative">
+<body class="w-screen h-screen flex flex-col justify-between select-none">
 
-    <header class="p-3 glass-effect flex justify-between items-center z-10 shadow-lg shrink-0">
-        <div class="flex items-center gap-3">
-            <img src="logo.png" alt="Logo" class="w-10 h-10 rounded-lg shadow-lg object-cover bg-slate-800 hidden sm:block">
-            <div>
-                <h1 class="text-lg font-bold leading-none bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">HYDRA-LOGIC</h1>
-                <p class="text-xs text-slate-400" id="header-level-info">Level 0</p>
-            </div>
-        </div>
-        
-        <div class="flex gap-4 items-center">
-            <button id="btn-editor" class="text-xs bg-slate-800 border border-slate-600 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-300 font-bold flex items-center gap-2 transition-colors">
-                <span>🛠️ Editor</span>
-            </button>
-            <button id="btn-open-profile" class="flex items-center gap-3 hover:bg-slate-800 p-2 rounded-xl transition-colors border border-transparent hover:border-slate-700">
-                <div class="text-right">
-                    <div class="text-sm font-bold text-cyan-100 hidden sm:block" id="player-name">Gast</div>
-                    <div class="flex items-center gap-1 justify-end">
-                        <span id="player-stars" class="font-bold text-yellow-400 text-xs">0</span>
-                        <svg class="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <span class="text-[10px] text-slate-400 ml-1"><span id="player-xp">0</span> XP</span>
-                    </div>
+    <div id="level-selection" class="fixed inset-0 z-50 bg-slate-950 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-md w-full mx-auto flex flex-col flex-1">
+            <header class="flex justify-between items-center mb-8 mt-4">
+                <div>
+                    <h1 class="text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">HYDRA-LOGIC</h1>
+                    <p class="text-xs text-slate-400 tracking-widest mt-1">QUANTUM FLOW SIMULATOR</p>
                 </div>
-                <div id="header-avatar" class="text-3xl bg-slate-700 rounded-full w-10 h-10 flex items-center justify-center shadow-lg">👨‍🔧</div>
-            </button>
-            <button id="menu-btn" class="p-2 hover:bg-slate-700 rounded-full transition-colors" onclick="location.reload()">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
-            </button>
+                <button id="btn-open-profile" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl shadow-lg hover:bg-slate-700 transition-all" title="Profil & Einstellungen">👨‍🔧</button>
+            </header>
+
+            <div class="glass-effect p-4 rounded-2xl mb-6 flex justify-around text-center shadow-inner">
+                <div>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider">Rang</p>
+                    <p id="player-name" class="text-sm font-bold text-cyan-300">Techniker</p>
+                </div>
+                <div class="w-[1px] bg-slate-800"></div>
+                <div>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider">Erfahrung</p>
+                    <p class="text-sm font-bold text-emerald-400"><span id="player-xp">0</span> XP</p>
+                </div>
+                <div class="w-[1px] bg-slate-800"></div>
+                <div>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider">Sterne</p>
+                    <p class="text-sm font-bold text-yellow-400"><span id="player-stars">0</span> ★</p>
+                </div>
+            </div>
+
+            <h2 class="text-sm font-bold tracking-widest text-slate-400 uppercase mb-4 px-1">Sektoren-Auswahl</h2>
+            <div id="level-grid" class="grid grid-cols-4 gap-3 mb-8 flex-1">
+                </div>
+        </div>
+    </div>
+
+    <header class="w-full h-14 border-b border-slate-800 glass-effect px-4 flex items-center justify-between z-10 flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <button onclick="location.reload()" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs font-bold hover:bg-slate-700" title="Zur Levelauswahl">⇦ Menü</button>
+            <span id="header-level-info" class="font-black text-cyan-400 tracking-wider">Sektor-01</span>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-mono">
+            <div class="text-right">
+                <p class="text-[9px] text-slate-500 uppercase">Klicks</p>
+                <p class="text-sm font-bold text-slate-300"><span id="click-counter">0</span>/<span id="par-clicks">0</span></p>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shadow" id="header-avatar">👨‍🔧</div>
         </div>
     </header>
 
-    <main class="flex-grow relative overflow-hidden bg-slate-900">
-        <canvas id="game-canvas" class="w-full h-full"></canvas>
-
-        <div id="level-selection" class="absolute inset-0 z-20 bg-slate-950/95 flex flex-col items-center p-6 transition-all duration-500 overflow-y-auto">
-            <h2 class="text-2xl font-light mb-8 tracking-widest text-cyan-200 uppercase mt-4">Missionen</h2>
-            <div id="level-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-4 w-full max-w-6xl pb-10"></div>
-        </div>
-
-        <div id="game-controls" class="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col gap-2 w-[98%] max-w-3xl hidden pointer-events-auto z-10">
-            <div class="flex justify-between items-center px-4 py-1 bg-slate-900/80 rounded-full border border-slate-700/50 backdrop-blur-sm self-center shadow-lg">
-                <span class="text-xs text-slate-400">Bauteile platziert: <span id="click-counter" class="text-white font-bold">0</span> / <span id="par-clicks" class="text-yellow-400">0</span></span>
-            </div>
-            
-            <div class="glass-effect p-2 rounded-2xl flex justify-start items-center px-2 gap-2 border border-slate-700 overflow-x-auto pb-2">
-                <button class="tool-btn active shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="PIPE_STRAIGHT" id="btn-t-straight">
-                    <span class="text-2xl">━</span> <span class="text-[10px] mt-1"><span id="inv-straight">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="PIPE_ANGLE" id="btn-t-angle">
-                    <span class="text-2xl">┗</span> <span class="text-[10px] mt-1"><span id="inv-angle">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="PIPE_CROSS" id="btn-t-cross">
-                    <span class="text-2xl">╋</span> <span class="text-[10px] mt-1"><span id="inv-cross">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="AND_GATE" id="btn-t-and">
-                    <span class="text-xl">&</span> <span class="text-[10px] mt-1"><span id="inv-and">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="MIXER" id="btn-t-mix">
-                    <span class="text-xl">M</span> <span class="text-[10px] mt-1"><span id="inv-mix">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="SPLITTER" id="btn-t-split">
-                    <span class="text-xl">S</span> <span class="text-[10px] mt-1"><span id="inv-split">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="PORTAL" id="btn-t-portal">
-                    <span class="text-xl">O</span> <span class="text-[10px] mt-1"><span id="inv-portal">0</span>x</span>
-                </button>
-                <button class="tool-btn shrink-0 w-16 h-16 bg-slate-800 rounded-xl border border-slate-600 transition-all text-xs font-bold shadow flex flex-col items-center justify-center" data-tool="VALVE" id="btn-t-valve">
-                    <span class="text-xl">V</span> <span class="text-[10px] mt-1"><span id="inv-valve">0</span>x</span>
-                </button>
-                
-                <button class="tool-btn shrink-0 w-16 h-16 bg-red-900/40 rounded-xl border border-red-800 transition-all text-xs font-bold text-red-200 shadow flex flex-col items-center justify-center ml-auto" data-tool="DELETE">
-                    <span class="text-xl">✖</span> <span class="text-[10px] mt-1">Del</span>
-                </button>
-            </div>
-
-            <div class="flex gap-2">
-                <button id="btn-solution" class="p-4 bg-yellow-900/30 rounded-2xl border border-yellow-700/50 hover:bg-yellow-800/50 glass-effect" title="Tipp anzeigen">
-                    <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a7 7 0 00-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 00-7-7zM9 21a1 1 0 001 1h4a1 1 0 001-1v-1H9v1z"></path></svg>
-                </button>
-                <button id="btn-reset" class="p-4 bg-slate-800 rounded-2xl border border-slate-700 hover:bg-slate-700 glass-effect" title="Neustart">
-                    <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                </button>
-                <button id="btn-play" class="flex-grow py-4 bg-gradient-to-r from-cyan-600 to-emerald-600 rounded-2xl font-bold uppercase tracking-wider shadow-lg hover:from-cyan-500 hover:to-emerald-500 transition-all border border-cyan-400/30">
-                    Fluss Starten
-                </button>
-            </div>
-        </div>
-
-        <div id="win-overlay" class="absolute inset-0 z-30 bg-black/90 flex flex-col items-center justify-center hidden backdrop-blur-md">
-            <h2 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-2 drop-shadow-lg text-center" id="win-title">Level Abgeschlossen!</h2>
-            <p class="text-sm text-slate-400 mb-6" id="win-subtitle"></p>
-            
-            <div class="flex gap-4 mb-6" id="win-stars">
-                <svg class="w-16 h-16 star-icon" fill="currentColor" viewBox="0 0 20 20" id="star-1"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                <svg class="w-20 h-20 star-icon -mt-4" fill="currentColor" viewBox="0 0 20 20" id="star-2"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                <svg class="w-16 h-16 star-icon" fill="currentColor" viewBox="0 0 20 20" id="star-3"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-            </div>
-            
-            <p id="win-xp" class="text-2xl text-cyan-300 mb-8 font-bold">+100 XP</p>
-            <button id="btn-next" class="px-8 py-4 bg-cyan-600 rounded-xl font-bold text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-900/50 uppercase tracking-widest text-lg">Weiter</button>
-        </div>
-
+    <main class="flex-1 w-full relative overflow-hidden bg-slate-950">
+        <canvas id="game-canvas" class="w-full h-full block touch-none"></canvas>
     </main>
 
-    <div id="profile-modal" class="absolute inset-0 z-50 bg-black/80 hidden flex items-center justify-center backdrop-blur-md">
-        <div class="bg-slate-800 border border-slate-600 p-6 rounded-2xl w-[90%] max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 class="text-2xl font-bold text-cyan-300 mb-6 border-b border-slate-700 pb-2">Einstellungen</h2>
+    <footer id="game-controls" class="w-full border-t border-slate-800 glass-effect p-3 z-10 flex-shrink-0 hidden">
+        <div id="inventory-dock" class="flex gap-2 justify-center items-center overflow-x-auto pb-2 mb-2 no-scrollbar">
+            <button id="btn-t-straight" data-tool="PIPE_STRAIGHT" class="tool-btn active w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-lg">║</span><span id="inv-straight" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-angle" data-tool="PIPE_ANGLE" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-lg">╚</span><span id="inv-angle" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-cross" data-tool="PIPE_CROSS" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-lg">╬</span><span id="inv-cross" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-and" data-tool="AND_GATE" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-xs font-bold text-red-400">AND</span><span id="inv-and" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-mix" data-tool="MIXER" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-xs font-bold text-purple-400">MIX</span><span id="inv-mix" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-split" data-tool="SPLITTER" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-xs font-bold text-orange-400">SPLIT</span><span id="inv-split" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-portal" data-tool="PORTAL" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-lg text-fuchsia-400">🌀</span><span id="inv-portal" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <button id="btn-t-valve" data-tool="VALVE" class="tool-btn w-12 h-14 rounded-xl border border-slate-700 bg-slate-800 flex flex-col items-center justify-center relative transition-all">
+                <span class="text-lg text-amber-400">⧓</span><span id="inv-valve" class="text-[9px] text-slate-400 absolute bottom-0.5">0</span>
+            </button>
+            <div class="w-[1px] h-10 bg-slate-800 mx-1"></div>
+            <button data-tool="DELETE" class="tool-btn w-12 h-14 rounded-xl border border-red-900 bg-slate-900 flex items-center justify-center transition-all" title="Löschen">
+                <span class="text-xl text-red-500">✕</span>
+            </button>
+        </div>
+
+        <div class="flex gap-2 max-w-md mx-auto">
+            <button id="btn-solution" class="flex-1 py-3 rounded-xl border border-slate-700 bg-slate-800 font-bold text-sm text-slate-300 hover:bg-slate-700 transition-colors">Tipp</button>
+            <button id="btn-reset" class="flex-1 py-3 rounded-xl border border-slate-700 bg-slate-800 font-bold text-sm text-slate-300 hover:bg-slate-700 transition-colors">Reset</button>
+            <button id="btn-play" class="flex-[2] py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-black text-sm tracking-wider uppercase shadow-lg shadow-cyan-500/20 active:scale-95 transition-all">Fluss starten ▷</button>
+        </div>
+    </footer>
+
+    <div id="profile-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+        <div class="glass-effect w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col">
+            <h3 class="text-xl font-black text-cyan-400 tracking-wider mb-4">TECHNIKER-PROFIL</h3>
             
             <div class="mb-4">
-                <label class="block text-xs text-slate-400 mb-1">Spielername</label>
-                <input type="text" id="input-player-name" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white font-bold focus:outline-none focus:border-cyan-500">
+                <label class="text-[10px] text-slate-400 uppercase tracking-widest block mb-1">Codename</label>
+                <input type="text" id="input-player-name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-400 font-bold" placeholder="Dein Name">
             </div>
 
-            <div class="mb-6">
-                <label class="block text-xs text-slate-400 mb-2">Avatar wählen</label>
-                <div class="flex gap-2 justify-between" id="avatar-container">
-                    <button class="avatar-btn p-3 text-3xl bg-slate-900 rounded-xl border border-slate-700" data-avatar="👨‍🔧">👨‍🔧</button>
-                    <button class="avatar-btn p-3 text-3xl bg-slate-900 rounded-xl border border-slate-700" data-avatar="👩‍🔬">👩‍🔬</button>
-                    <button class="avatar-btn p-3 text-3xl bg-slate-900 rounded-xl border border-slate-700" data-avatar="🤖">🤖</button>
-                    <button class="avatar-btn p-3 text-3xl bg-slate-900 rounded-xl border border-slate-700" data-avatar="👽">👽</button>
-                    <button class="avatar-btn p-3 text-3xl bg-slate-900 rounded-xl border border-slate-700" data-avatar="🐙">🐙</button>
+            <div class="mb-5">
+                <label class="text-[10px] text-slate-400 uppercase tracking-widest block mb-2">Avatar auswählen</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button data-avatar="👨‍🔧" class="avatar-btn h-12 rounded-xl border border-slate-700 text-2xl flex items-center justify-center">👨‍🔧</button>
+                    <button data-avatar="👩‍💻" class="avatar-btn h-12 rounded-xl border border-slate-700 text-2xl flex items-center justify-center">👩‍💻</button>
+                    <button data-avatar="🤖" class="avatar-btn h-12 rounded-xl border border-slate-700 text-2xl flex items-center justify-center">🤖</button>
+                    <button data-avatar="👽" class="avatar-btn h-12 rounded-xl border border-slate-700 text-2xl flex items-center justify-center">👽</button>
                 </div>
             </div>
-            
-            <div class="mb-6 flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-700">
-                <div>
-                    <h3 class="text-sm font-bold text-white">Audio & Sound</h3>
-                    <p class="text-[10px] text-slate-400">Geräusche beim Bauen & Fließen</p>
-                </div>
+
+            <div class="border-t border-slate-800 my-2 pt-4 flex justify-between items-center mb-3">
+                <div class="text-sm font-bold text-slate-300">Audio-Effekte</div>
                 <button id="toggle-audio" class="w-12 h-6 bg-slate-700 rounded-full relative transition-colors"><div class="w-6 h-6 bg-white rounded-full absolute left-0 top-0 shadow transition-transform" id="audio-knob"></div></button>
             </div>
             
-            <div class="mb-6 flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-700">
+            <div class="border-t border-slate-800 my-2 pt-2 flex justify-between items-center mb-6">
                 <div>
-                    <h3 class="text-sm font-bold text-white">Barrierefreiheit</h3>
-                    <p class="text-[10px] text-slate-400">Farbenblind-Modus (Symbole)</p>
+                    <div class="text-sm font-bold text-slate-300">Barrierefreiheit</div>
+                    <div class="text-[10px] text-slate-500">Muster-Overlays für Farbenblindheit</div>
                 </div>
                 <button id="toggle-colorblind" class="w-12 h-6 bg-slate-700 rounded-full relative transition-colors"><div class="w-6 h-6 bg-white rounded-full absolute left-0 top-0 shadow transition-transform" id="colorblind-knob"></div></button>
             </div>
@@ -167,15 +145,35 @@
                     <p class="text-xl font-bold text-emerald-400" id="modal-xp">0 XP</p>
                 </div>
                 <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 text-center">
-                    <p class="text-[10px] text-slate-400 uppercase tracking-wider">Level gelöst</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider">Sterne Gesamt</p>
                     <p class="text-xl font-bold text-yellow-400" id="modal-stars">0</p>
                 </div>
             </div>
             
             <div class="flex gap-3">
                 <button id="btn-close-profile" class="flex-1 py-3 bg-slate-700 rounded-xl text-sm font-bold hover:bg-slate-600 transition-colors">Schließen</button>
-                <button id="btn-save-profile" class="flex-1 py-3 bg-cyan-600 rounded-xl text-sm font-bold hover:bg-cyan-500 transition-colors text-white shadow-lg">Speichern</button>
+                <button id="btn-save-profile" class="flex-1 py-3 bg-cyan-600 text-slate-950 font-bold text-sm rounded-xl hover:bg-cyan-500 transition-colors">Speichern</button>
             </div>
+        </div>
+    </div>
+
+    <div id="win-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-center justify-center p-6 hidden">
+        <div class="glass-effect w-full max-w-xs rounded-3xl p-6 text-center border-emerald-500/30 shadow-2xl">
+            <div class="w-16 h-16 bg-emerald-500/20 border border-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h3 class="text-2xl font-black text-emerald-400 tracking-wider mb-1">SEKTOR BEREINIGT</h3>
+            <p class="text-xs text-slate-400 uppercase tracking-widest mb-4">Fluss stabilisiert</p>
+            
+            <div class="flex justify-center gap-2 mb-6" id="win-stars">
+                </div>
+
+            <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 mb-6 font-mono text-xs text-left space-y-1">
+                <div class="flex justify-between"><span class="text-slate-500">Bonus-Erfahrung:</span><span id="win-xp" class="text-emerald-400 font-bold">+100 XP</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Klick-Bewertung:</span><span id="win-clicks-info" class="text-cyan-400 font-bold">Optimal</span></div>
+            </div>
+
+            <button id="btn-next" class="w-full py-3 bg-emerald-500 text-slate-950 font-black tracking-wider rounded-xl uppercase active:scale-95 transition-all">Nächster Sektor ⇨</button>
         </div>
     </div>
 
