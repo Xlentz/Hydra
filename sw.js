@@ -1,10 +1,9 @@
-const CACHE_NAME = 'hydra-logic-dynamic';
+const CACHE_NAME = 'hydra-logic-v9';
 const ASSETS = [
   './',
   './index.html',
   './levels.js',
   './app.js',
-  './logo.png',
   'https://cdn.tailwindcss.com'
 ];
 
@@ -29,11 +28,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  // Network-First Strategie
   event.respondWith(
     fetch(event.request)
       .then(networkResponse => {
-        // Update Cache, wenn das Netzwerk antwortet
         if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
           return networkResponse;
         }
@@ -44,7 +41,6 @@ self.addEventListener('fetch', event => {
         return networkResponse;
       })
       .catch(() => {
-        // Fallback auf den Cache, wenn wir Offline sind
         return caches.match(event.request);
       })
   );

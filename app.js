@@ -54,18 +54,27 @@ class HydraGame {
         this.grid = []; 
         this.initialInventory = null; 
         this.activeTool = 'PIPE_STRAIGHT';
-        this.cellSize = 60;
+        this.cellSize = 75;
         this.offsetX = 0; this.offsetY = 0;
         
         this.isFlowing = false;
         this.clicks = 0;
         this.flowAnimationProgress = 0; 
+        this.time = 0;
         
-        this.colorMap = { 'blue': '#3b82f6', 'yellow': '#eab308', 'red': '#ef4444', 'green': '#22c55e', 'purple': '#a855f7', 'orange': '#f97316' };
+        // High-end glowing colors
+        this.colorMap = { 
+            'blue': '#0ea5e9', 
+            'yellow': '#eab308', 
+            'red': '#ef4444', 
+            'green': '#10b981', 
+            'purple': '#a855f7', 
+            'orange': '#f97316' 
+        };
         this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
-            name: "Gast-Techniker", avatar: "👨‍🔧", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
+            name: "Gast-Operator", avatar: "👽", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
         };
         this.audio.enabled = this.playerStats.audio;
 
@@ -81,7 +90,7 @@ class HydraGame {
         this.resize();
         this.renderLevelList();
         this.setupEventListeners();
-        requestAnimationFrame(() => this.gameLoop());
+        requestAnimationFrame((t) => this.gameLoop(t));
         this.updateUI(); 
     }
 
@@ -95,7 +104,7 @@ class HydraGame {
         const gridW = this.currentLevel.gridSize.cols * this.cellSize;
         const gridH = this.currentLevel.gridSize.rows * this.cellSize;
         this.offsetX = (this.canvas.width - gridW) / 2;
-        this.offsetY = (this.canvas.height - gridH) / 2 - 40; 
+        this.offsetY = (this.canvas.height - gridH) / 2 - 50; 
     }
 
     updateUI() {
@@ -134,7 +143,7 @@ class HydraGame {
                 }
             }
             
-            setEl('header-level-info', `Level ${this.currentLevel.id}`);
+            setEl('header-level-info', `Sektor ${this.currentLevel.id}`);
             setEl('click-counter', this.clicks);
             setEl('par-clicks', this.currentLevel.parClicks || 10);
         }
@@ -143,16 +152,16 @@ class HydraGame {
         const audioKnob = document.getElementById('audio-knob');
         if(audioBtn) {
             audioBtn.classList.toggle('bg-cyan-500', this.playerStats.audio);
-            audioBtn.classList.toggle('bg-slate-700', !this.playerStats.audio);
-            audioKnob.style.transform = this.playerStats.audio ? 'translateX(24px)' : 'translateX(0)';
+            audioBtn.classList.toggle('bg-zinc-800', !this.playerStats.audio);
+            audioKnob.style.transform = this.playerStats.audio ? 'translateX(28px)' : 'translateX(0)';
         }
         
         const cbBtn = document.getElementById('toggle-colorblind');
         const cbKnob = document.getElementById('colorblind-knob');
         if(cbBtn) {
             cbBtn.classList.toggle('bg-cyan-500', this.playerStats.colorblind);
-            cbBtn.classList.toggle('bg-slate-700', !this.playerStats.colorblind);
-            cbKnob.style.transform = this.playerStats.colorblind ? 'translateX(24px)' : 'translateX(0)';
+            cbBtn.classList.toggle('bg-zinc-800', !this.playerStats.colorblind);
+            cbKnob.style.transform = this.playerStats.colorblind ? 'translateX(28px)' : 'translateX(0)';
         }
     }
 
@@ -167,15 +176,15 @@ class HydraGame {
             if (stars > 0) {
                 starHtml = `<div class="flex mt-1">`;
                 for(let i=0; i<3; i++) {
-                    starHtml += `<svg class="w-3 h-3 ${i<stars ? 'text-yellow-400' : 'text-slate-600'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+                    starHtml += `<svg class="w-3.5 h-3.5 ${i<stars ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'text-zinc-700'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
                 }
                 starHtml += `</div>`;
             }
             
             let isCompleted = stars > 0;
             
-            btn.className = `h-16 flex flex-col items-center justify-center rounded-xl font-bold transition-all ${isCompleted ? 'bg-cyan-900 border-cyan-400' : 'bg-slate-800 border-slate-700 opacity-80'} hover:bg-cyan-800 shadow-lg border hover:scale-105`;
-            btn.innerHTML = `<span class="text-xl text-cyan-100">${level.id}</span>${starHtml}`;
+            btn.className = `h-20 flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
+            btn.innerHTML = `<span class="text-2xl ${isCompleted ? 'text-cyan-300' : 'text-zinc-500'}">${level.id}</span>${starHtml}`;
             btn.onclick = () => this.startLevel(index);
             grid.appendChild(btn);
         });
@@ -190,8 +199,9 @@ class HydraGame {
         this.flowAnimationProgress = 0;
         
         const { cols, rows } = this.currentLevel.gridSize;
-        this.cellSize = Math.min(this.canvas.width / (cols + 1), this.canvas.height / (rows + 3));
-        if (this.cellSize > 70) this.cellSize = 70;
+        // Make cell size a bit bigger for optical appeal
+        this.cellSize = Math.min((this.canvas.width - 40) / cols, (this.canvas.height - 180) / rows);
+        if (this.cellSize > 85) this.cellSize = 85;
         
         this.centerGrid();
         this.grid = Array(rows).fill().map(() => Array(cols).fill(null));
@@ -204,6 +214,12 @@ class HydraGame {
         
         document.getElementById('level-selection').classList.add('hidden');
         document.getElementById('game-controls').classList.remove('hidden');
+        
+        // Remove active class from delete tool, set to straight pipe by default
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-t-straight').classList.add('active');
+        this.activeTool = 'PIPE_STRAIGHT';
+        
         this.updateUI();
         this.calculateFlow(true); 
     }
@@ -251,11 +267,28 @@ class HydraGame {
             this.updateUI();
         };
 
-        document.querySelectorAll('.tool-btn').forEach(btn => {
+        document.querySelectorAll('.tool-btn, #btn-t-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tool-btn, #btn-t-delete').forEach(b => b.classList.remove('active'));
                 const target = e.currentTarget;
-                target.classList.add('active');
+                
+                // If it's a regular tool button, handle it normally
+                if(target.classList.contains('tool-btn')) {
+                    target.classList.add('active');
+                } else {
+                    // For the delete button (which doesn't have the tool-btn class for styling reasons)
+                    target.classList.add('active');
+                    target.style.transform = 'scale(1.05)';
+                    target.style.borderColor = '#fda4af';
+                    target.style.backgroundColor = 'rgba(159, 18, 57, 0.8)';
+                    
+                    setTimeout(() => {
+                        target.style.transform = '';
+                        target.style.borderColor = '';
+                        target.style.backgroundColor = '';
+                    }, 200);
+                }
+                
                 this.activeTool = target.dataset.tool;
             });
         });
@@ -277,12 +310,12 @@ class HydraGame {
             
             this.flowAnimationProgress = 0;
             const animInterval = setInterval(() => {
-                this.flowAnimationProgress += 5;
+                this.flowAnimationProgress += 2.5; // Smooth out animation
                 if(this.flowAnimationProgress >= 100) {
                     clearInterval(animInterval);
                     this.checkWinCondition();
                 }
-            }, 50);
+            }, 30);
         };
         
         document.getElementById('btn-reset').onclick = () => {
@@ -321,14 +354,13 @@ class HydraGame {
                 if(cell.type === 'VALVE') inv.valves++;
                 this.grid[y][x] = null;
                 this.audio.playClick();
-                this.clicks--; // Refund click on delete
+                this.clicks--;
             }
         } else {
             if (cell) {
                 if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
                     cell.rotation = (cell.rotation + 1) % 4;
                     this.audio.playClick();
-                    // Rotating no longer penalizes clicks!
                 }
             } else {
                 let p = false;
@@ -592,99 +624,135 @@ class HydraGame {
                 document.getElementById(`star-${num}`).classList.toggle('filled', num <= earnedStars);
             });
             
-            winTitle.textContent = "Level Abgeschlossen!";
-            winTitle.className = "text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 mb-2 drop-shadow-lg text-center";
             winSub.textContent = `Du hast ${this.clicks} Bauteile verbaut (Optimal: ${par})`;
             winXp.textContent = prevStars === 0 ? `+${xp} XP` : (earnedStars > prevStars ? `+${Math.floor(xp * 0.5)} XP` : '+10 XP');
-            winXp.className = "text-2xl text-cyan-300 mb-8 font-bold";
             
             document.getElementById('win-overlay').classList.remove('hidden');
             document.getElementById('game-controls').classList.add('hidden');
         }
     }
 
-    gameLoop() {
+    gameLoop(timestamp) {
+        this.time = timestamp || 0;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
         if (this.currentLevel) {
             this.ctx.save();
             this.ctx.translate(this.offsetX, this.offsetY);
             
-            this.drawGridLines();
-            this.drawSourcesAndTargets();
             this.drawPlacedComponents();
+            this.drawSourcesAndTargets();
             
             this.ctx.restore();
         }
-        requestAnimationFrame(() => this.gameLoop());
-    }
-
-    drawGridLines() {
-        const { cols, rows } = this.currentLevel.gridSize;
-        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-        this.ctx.lineWidth = 1;
-        for(let r = 0; r <= rows; r++) {
-            this.ctx.beginPath(); this.ctx.moveTo(0, r * this.cellSize); this.ctx.lineTo(cols * this.cellSize, r * this.cellSize); this.ctx.stroke();
-        }
-        for(let c = 0; c <= cols; c++) {
-            this.ctx.beginPath(); this.ctx.moveTo(c * this.cellSize, 0); this.ctx.lineTo(c * this.cellSize, rows * this.cellSize); this.ctx.stroke();
-        }
+        requestAnimationFrame((t) => this.gameLoop(t));
     }
     
     drawCB(x, y, color) {
         if(!this.playerStats.colorblind) return;
         const shape = this.shapeMap[color];
-        this.ctx.fillStyle = "rgba(0,0,0,0.5)";
+        this.ctx.fillStyle = "rgba(0,0,0,0.6)";
         this.ctx.beginPath();
-        if(shape==='circle') this.ctx.arc(x,y,4,0,Math.PI*2);
-        else if(shape==='square') this.ctx.rect(x-4,y-4,8,8);
-        else if(shape==='triangle') { this.ctx.moveTo(x,y-5); this.ctx.lineTo(x-4,y+4); this.ctx.lineTo(x+4,y+4); }
-        else if(shape==='diamond') { this.ctx.moveTo(x,y-5); this.ctx.lineTo(x+4,y); this.ctx.lineTo(x,y+5); this.ctx.lineTo(x-4,y); }
-        else this.ctx.arc(x,y,4,0,Math.PI*2); 
+        if(shape==='circle') this.ctx.arc(x,y,5,0,Math.PI*2);
+        else if(shape==='square') this.ctx.rect(x-5,y-5,10,10);
+        else if(shape==='triangle') { this.ctx.moveTo(x,y-6); this.ctx.lineTo(x-5,y+5); this.ctx.lineTo(x+5,y+5); }
+        else if(shape==='diamond') { this.ctx.moveTo(x,y-6); this.ctx.lineTo(x+5,y); this.ctx.lineTo(x,y+6); this.ctx.lineTo(x-5,y); }
+        else this.ctx.arc(x,y,5,0,Math.PI*2); 
         this.ctx.fill();
     }
 
     drawSourcesAndTargets() {
         const s = this.cellSize;
         const hw = s / 2;
+        
+        // Animated pulse effect
+        const pulse = Math.sin(this.time / 300) * 0.1 + 0.9;
+        
         this.currentLevel.sources.forEach(source => {
             const x = source.x * s; const y = source.y * s;
+            const col = this.colorMap[source.color];
 
-            this.ctx.fillStyle = this.colorMap[source.color];
-            this.ctx.fillRect(x + hw - 4, y, 8, s);
-            this.ctx.fillRect(x, y + hw - 4, s, 8);
-
-            this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[source.color];
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
-            this.ctx.shadowBlur = 0; 
+            this.ctx.save();
+            this.ctx.translate(x + hw, y + hw);
             
-            this.ctx.fillStyle = "#f8fafc";
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, 4, 0, Math.PI * 2); this.ctx.fill();
-            this.drawCB(x+hw, y+hw, source.color);
+            // Outer glow ring
+            this.ctx.shadowBlur = 20;
+            this.ctx.shadowColor = col;
+            this.ctx.strokeStyle = col;
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath(); 
+            this.ctx.arc(0, 0, s*0.4 * pulse, 0, Math.PI * 2); 
+            this.ctx.stroke();
+            this.ctx.shadowBlur = 0;
+            
+            // Inner core
+            this.ctx.fillStyle = col;
+            this.ctx.beginPath(); 
+            this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); 
+            this.ctx.fill();
+            
+            // Highlight
+            this.ctx.fillStyle = "rgba(255,255,255,0.8)";
+            this.ctx.beginPath(); 
+            this.ctx.arc(-s*0.08, -s*0.08, s*0.05, 0, Math.PI * 2); 
+            this.ctx.fill();
+
+            this.drawCB(0, 0, source.color);
+            this.ctx.restore();
         });
 
         this.currentLevel.targets.forEach(target => {
             const x = target.x * s; const y = target.y * s;
+            const reqCol = this.colorMap[target.requiredColor];
 
-            this.ctx.fillStyle = "#475569";
-            this.ctx.fillRect(x + hw - 6, y, 12, s);
-            this.ctx.fillRect(x, y + hw - 6, s, 12);
-
-            this.ctx.strokeStyle = this.colorMap[target.requiredColor];
-            this.ctx.lineWidth = 4; this.ctx.setLineDash([5, 5]);
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.4, 0, Math.PI * 2); this.ctx.stroke();
-            this.ctx.setLineDash([]); 
+            this.ctx.save();
+            this.ctx.translate(x + hw, y + hw);
             
-            this.ctx.fillStyle = "#1e293b";
-            this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+            // Hexagon Target Receptacle
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = reqCol;
+            this.ctx.strokeStyle = reqCol;
+            this.ctx.lineWidth = 3;
+            
+            this.ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = 2 * Math.PI / 6 * i;
+                const hx = s * 0.45 * Math.cos(angle);
+                const hy = s * 0.45 * Math.sin(angle);
+                if (i === 0) this.ctx.moveTo(hx, hy);
+                else this.ctx.lineTo(hx, hy);
+            }
+            this.ctx.closePath();
+            this.ctx.stroke();
+            this.ctx.shadowBlur = 0;
+            
+            // Inner dark circle
+            this.ctx.fillStyle = "#09090b";
+            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2); this.ctx.fill();
 
             let isFilled = target.currentFlow;
             if(this.isFlowing && this.flowAnimationProgress < 90) isFilled = false;
 
             if (isFilled) {
-                this.ctx.fillStyle = this.colorMap[target.currentFlow];
-                this.ctx.beginPath(); this.ctx.arc(x + hw, y + hw, s*0.3, 0, Math.PI * 2); this.ctx.fill();
+                const fillCol = this.colorMap[target.currentFlow];
+                this.ctx.shadowBlur = 25;
+                this.ctx.shadowColor = fillCol;
+                this.ctx.fillStyle = fillCol;
+                this.ctx.beginPath(); 
+                this.ctx.arc(0, 0, s*0.3 * pulse, 0, Math.PI * 2); 
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            } else {
+                // Dashed outline for required color
+                this.ctx.strokeStyle = reqCol;
+                this.ctx.lineWidth = 2; 
+                this.ctx.setLineDash([4, 4]);
+                this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); this.ctx.stroke();
+                this.ctx.setLineDash([]);
             }
-            this.drawCB(x+hw, y+hw, target.requiredColor);
+            
+            this.drawCB(0, 0, target.requiredColor);
+            this.ctx.restore();
         });
     }
 
@@ -695,14 +763,22 @@ class HydraGame {
         for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
             for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
                 const cell = this.grid[r][c];
-                if (!cell) continue;
+                if (!cell) {
+                    // Draw subtle grid point
+                    this.ctx.fillStyle = "rgba(255,255,255,0.05)";
+                    this.ctx.beginPath(); this.ctx.arc(c*s + hw, r*s + hw, 2, 0, Math.PI*2); this.ctx.fill();
+                    continue;
+                }
                 const x = c * s; const y = r * s;
 
                 if (cell.type === 'WALL') {
-                    this.ctx.fillStyle = "#1e293b";
-                    this.ctx.fillRect(x+1, y+1, s-2, s-2);
-                    this.ctx.strokeStyle = "#0f172a"; this.ctx.lineWidth = 2;
-                    this.ctx.beginPath(); this.ctx.moveTo(x, y); this.ctx.lineTo(x+s, y+s); this.ctx.moveTo(x+s, y); this.ctx.lineTo(x, y+s); this.ctx.stroke();
+                    this.ctx.fillStyle = "#18181b"; // darker zinc
+                    this.ctx.fillRect(x+2, y+2, s-4, s-4);
+                    // Tech pattern for wall
+                    this.ctx.strokeStyle = "#27272a"; 
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath(); this.ctx.moveTo(x+4, y+4); this.ctx.lineTo(x+s-4, y+s-4); this.ctx.stroke();
+                    this.ctx.beginPath(); this.ctx.moveTo(x+s-4, y+4); this.ctx.lineTo(x+4, y+s-4); this.ctx.stroke();
                     continue;
                 }
 
@@ -713,7 +789,7 @@ class HydraGame {
                     this.ctx.rotate(cell.rotation * Math.PI / 2);
                 }
 
-                const pW = s * 0.3; 
+                const pW = s * 0.35; 
                 const hPw = pW / 2;
                 
                 let wCol = null;
@@ -722,104 +798,180 @@ class HydraGame {
                 }
                 
                 let showWater = wCol && (!this.isFlowing || this.flowAnimationProgress > 10); 
+                
+                // Base Pipe Material (Metallic)
+                const pipeGradient = this.ctx.createLinearGradient(-hPw, 0, hPw, 0);
+                pipeGradient.addColorStop(0, '#27272a');
+                pipeGradient.addColorStop(0.5, '#3f3f46');
+                pipeGradient.addColorStop(1, '#27272a');
 
                 if (cell.type === 'PIPE_STRAIGHT') {
-                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hw, -hPw, s, pW);
-                    this.ctx.fillStyle = "#94a3b8"; this.ctx.fillRect(-hw, -hPw, s, 2); this.ctx.fillRect(-hw, hPw - 2, s, 2);
+                    // Pipe Body
+                    this.ctx.fillStyle = pipeGradient;
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
+                    // Rims
+                    this.ctx.fillStyle = "#52525b"; 
+                    this.ctx.fillRect(-hw, -hPw, 4, pW); this.ctx.fillRect(hw-4, -hPw, 4, pW);
+                    
                     if(showWater) { 
-                        this.ctx.fillStyle = this.colorMap[wCol]; 
+                        const fillCol = this.colorMap[wCol];
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
+                        this.ctx.fillStyle = fillCol; 
                         let l = this.isFlowing ? (this.flowAnimationProgress/100)*s : s;
-                        this.ctx.fillRect(-hw, -hPw + 4, l, pW - 8); 
+                        this.ctx.fillRect(-hw, -hPw + 6, l, pW - 12); 
+                        this.ctx.shadowBlur = 0;
+                        
+                        // Add animated flowing particles
+                        if(this.isFlowing && this.flowAnimationProgress > 20) {
+                            this.ctx.fillStyle = "rgba(255,255,255,0.8)";
+                            const px = -hw + ((this.time/10) % s);
+                            if(px < -hw + l) {
+                                this.ctx.beginPath(); this.ctx.arc(px, 0, 2, 0, Math.PI*2); this.ctx.fill();
+                            }
+                        }
                         this.drawCB(0, 0, wCol);
                     }
                 } 
                 else if (cell.type === 'PIPE_ANGLE') {
-                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hPw, -hw, pW, hw + hPw); this.ctx.fillRect(-hPw, -hPw, hw + hPw, pW);
-                    this.ctx.fillStyle = "#94a3b8"; this.ctx.fillRect(-hPw, -hw, 2, hw + hPw); this.ctx.fillRect(-hPw, hPw - 2, hw + hPw, 2); this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw + 2); this.ctx.fillRect(hPw - 2, -hPw, hw - hPw + 2, 2); 
+                    this.ctx.fillStyle = pipeGradient; 
+                    this.ctx.fillRect(-hPw, -hw, pW, hw + hPw); 
+                    this.ctx.fillRect(-hPw, -hPw, hw + hPw, pW);
+                    
+                    // Outer Corner smoothing visual
+                    this.ctx.fillStyle = "#3f3f46";
+                    this.ctx.beginPath(); this.ctx.arc(-hPw, -hPw, pW, 0, Math.PI/2); this.ctx.fill();
+
                     if(showWater) { 
-                        this.ctx.fillStyle = this.colorMap[wCol];
+                        const fillCol = this.colorMap[wCol];
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
+                        this.ctx.fillStyle = fillCol;
                         let scale = this.isFlowing ? (this.flowAnimationProgress/100) : 1;
-                        this.ctx.fillRect(-hPw + 4, -hw, pW - 8, (hw + hPw - 4)*scale);
-                        this.ctx.fillRect(-hPw + 4, -hPw + 4, (hw + hPw - 4)*scale, pW - 8);
-                        this.drawCB(-2, -2, wCol);
+                        this.ctx.fillRect(-hPw + 6, -hw, pW - 12, (hw + hPw - 6)*scale);
+                        this.ctx.fillRect(-hPw + 6, -hPw + 6, (hw + hPw - 6)*scale, pW - 12);
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(-4, -4, wCol);
                     }
                 }
                 else if (cell.type === 'PIPE_CROSS') {
-                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hPw, -hw, pW, s); this.ctx.fillRect(-hw, -hPw, s, pW);
-                    this.ctx.fillStyle = "#94a3b8";
-                    this.ctx.fillRect(-hw, -hPw, hw - hPw, 2); this.ctx.fillRect(-hPw, -hw, 2, hw - hPw); this.ctx.fillRect(hPw, -hPw, hw - hPw, 2); this.ctx.fillRect(hPw - 2, -hw, 2, hw - hPw);
-                    this.ctx.fillRect(-hw, hPw - 2, hw - hPw, 2); this.ctx.fillRect(-hPw, hPw, 2, hw - hPw); this.ctx.fillRect(hPw, hPw - 2, hw - hPw, 2); this.ctx.fillRect(hPw - 2, hPw, 2, hw - hPw);
+                    this.ctx.fillStyle = pipeGradient; 
+                    this.ctx.fillRect(-hPw, -hw, pW, s); 
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
+                    
+                    // Central Joint
+                    this.ctx.fillStyle = "#52525b";
+                    this.ctx.fillRect(-hPw-2, -hPw-2, pW+4, pW+4);
                     
                     let flowV = (cell.flows && (cell.flows[0] || cell.flows[2]));
                     let flowH = (cell.flows && (cell.flows[1] || cell.flows[3]));
                     let animP = this.isFlowing ? (this.flowAnimationProgress/100)*s : s;
                     
-                    if(flowV && (!this.isFlowing || this.flowAnimationProgress > 10)) { this.ctx.fillStyle = this.colorMap[flowV]; this.ctx.fillRect(-hPw + 4, -hw, pW - 8, animP); this.drawCB(0, -hw/2, flowV); }
-                    if(flowH && (!this.isFlowing || this.flowAnimationProgress > 10)) { this.ctx.fillStyle = this.colorMap[flowH]; this.ctx.fillRect(-hw, -hPw + 4, animP, pW - 8); this.drawCB(-hw/2, 0, flowH); }
+                    if(flowV && (!this.isFlowing || this.flowAnimationProgress > 10)) { 
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[flowV];
+                        this.ctx.fillStyle = this.colorMap[flowV]; 
+                        this.ctx.fillRect(-hPw + 6, -hw, pW - 12, animP); 
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(0, -hw/2, flowV); 
+                    }
+                    if(flowH && (!this.isFlowing || this.flowAnimationProgress > 10)) { 
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[flowH];
+                        this.ctx.fillStyle = this.colorMap[flowH]; 
+                        this.ctx.fillRect(-hw, -hPw + 6, animP, pW - 12); 
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(-hw/2, 0, flowH); 
+                    }
                 }
                 else if (cell.type === 'VALVE') {
-                    this.ctx.fillStyle = "#334155"; this.ctx.fillRect(-hw, -hPw, s, pW); 
-                    this.ctx.fillStyle = "#94a3b8"; this.ctx.fillRect(-hw, -hPw, s, 2); this.ctx.fillRect(-hw, hPw - 2, s, 2);
-                    this.ctx.fillStyle = "#475569"; this.ctx.fillRect(-hPw, -hw, pW, s); 
+                    this.ctx.fillStyle = pipeGradient; this.ctx.fillRect(-hw, -hPw, s, pW); 
+                    // Central mechanism
+                    this.ctx.fillStyle = "#18181b"; this.ctx.fillRect(-hPw, -hw, pW, s); 
+                    this.ctx.strokeStyle = "#52525b"; this.ctx.lineWidth = 4; this.ctx.strokeRect(-hPw, -hw, pW, s);
                     
-                    this.ctx.fillStyle = "#ef4444"; this.ctx.beginPath(); this.ctx.arc(0,0,hPw+2, 0, Math.PI*2); this.ctx.fill();
+                    // Red dial
+                    this.ctx.fillStyle = "#ef4444"; 
+                    this.ctx.beginPath(); this.ctx.arc(0,0,hPw-2, 0, Math.PI*2); this.ctx.fill();
                     
                     let inlineFlow = (cell.flows && (cell.flows[1] || cell.flows[3]));
                     if(inlineFlow && (!this.isFlowing || this.flowAnimationProgress > 40)) {
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[inlineFlow];
                         this.ctx.fillStyle = this.colorMap[inlineFlow];
-                        this.ctx.fillRect(-hw, -hPw + 4, s, pW - 8);
+                        this.ctx.fillRect(-hw, -hPw + 6, s, pW - 12);
+                        this.ctx.shadowBlur = 0;
+                        // Turn the dial to show it's open
+                        this.ctx.fillStyle = "#b91c1c";
+                        this.ctx.fillRect(-hPw+4, -2, pW-8, 4);
+                    } else {
+                        // Closed dial
+                        this.ctx.fillStyle = "#b91c1c";
+                        this.ctx.fillRect(-2, -hPw+4, 4, pW-8);
                     }
                 }
                 else if (cell.type === 'AND_GATE' || cell.type === 'MIXER' || cell.type === 'SPLITTER') {
-                    this.ctx.fillStyle = "#475569"; this.ctx.fillRect(-6, -hw, 12, s); this.ctx.fillRect(-hw, -6, s, 12); 
+                    // Futuristic Device Base
+                    this.ctx.fillStyle = "#27272a"; 
+                    this.ctx.beginPath(); this.ctx.roundRect(-hw+5, -hw+5, s-10, s-10, 10); this.ctx.fill();
+                    this.ctx.strokeStyle = "#06b6d4"; this.ctx.lineWidth = 2; this.ctx.stroke();
                     
                     if (cell.type === 'AND_GATE') {
-                        this.ctx.fillStyle = "#1e293b"; this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2); this.ctx.fill();
-                        this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.stroke();
-                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 16px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("&", 0, 6);
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); this.ctx.fill();
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 18px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("&", 0, 6);
                         
                         if(cell.flows && cell.flows['out'] && (!this.isFlowing || this.flowAnimationProgress > 60)) {
+                            this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[cell.flows['out']];
                             this.ctx.fillStyle = this.colorMap[cell.flows['out']];
-                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI * 2); this.ctx.fill();
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+                            this.ctx.shadowBlur = 0;
                             this.drawCB(0,0,cell.flows['out']);
                         }
                     } else if (cell.type === 'MIXER') {
-                        this.ctx.fillStyle = "#1e293b"; this.ctx.fillRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
-                        this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.strokeRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.fillRect(-s*0.25, -s*0.25, s*0.5, s*0.5);
                         this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 12px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("MIX", 0, 4);
                         if(cell.flows && cell.flows['out'] && (!this.isFlowing || this.flowAnimationProgress > 60)) {
-                            this.ctx.fillStyle = this.colorMap[cell.flows['out']]; this.ctx.fillRect(-s*0.25, -s*0.25, s*0.5, s*0.5);
+                            this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[cell.flows['out']];
+                            this.ctx.fillStyle = this.colorMap[cell.flows['out']]; 
+                            this.ctx.fillRect(-s*0.3, -s*0.3, s*0.6, s*0.6);
+                            this.ctx.shadowBlur = 0;
                             this.drawCB(0,0,cell.flows['out']);
                         }
                     } else if (cell.type === 'SPLITTER') {
-                        this.ctx.fillStyle = "#1e293b"; this.ctx.beginPath(); this.ctx.moveTo(0,-s*0.35); this.ctx.lineTo(s*0.35,s*0.35); this.ctx.lineTo(-s*0.35,s*0.35); this.ctx.fill();
-                        this.ctx.strokeStyle = "#94a3b8"; this.ctx.lineWidth = 2; this.ctx.stroke();
-                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 10px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("SPLIT", 0, s*0.2);
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.beginPath(); this.ctx.moveTo(0,-s*0.25); this.ctx.lineTo(s*0.25,s*0.25); this.ctx.lineTo(-s*0.25,s*0.25); this.ctx.fill();
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 10px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("SPLIT", 0, s*0.15);
                         
                         if(cell.flows && (!this.isFlowing || this.flowAnimationProgress > 60)) {
                             if(cell.flows['out1_rendered']) {
+                                this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[cell.flows['out1_rendered']];
                                 this.ctx.fillStyle = this.colorMap[cell.flows['out1_rendered']];
-                                this.ctx.beginPath(); this.ctx.arc(-s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
-                                this.drawCB(-s*0.15, s*0.15, cell.flows['out1_rendered']);
+                                this.ctx.beginPath(); this.ctx.arc(-s*0.2, s*0.2, 8, 0, Math.PI*2); this.ctx.fill();
+                                this.ctx.shadowBlur = 0;
+                                this.drawCB(-s*0.2, s*0.2, cell.flows['out1_rendered']);
                             }
                             if(cell.flows['out2_rendered']) {
+                                this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[cell.flows['out2_rendered']];
                                 this.ctx.fillStyle = this.colorMap[cell.flows['out2_rendered']];
-                                this.ctx.beginPath(); this.ctx.arc(s*0.15, s*0.15, 4, 0, Math.PI*2); this.ctx.fill();
-                                this.drawCB(s*0.15, s*0.15, cell.flows['out2_rendered']);
+                                this.ctx.beginPath(); this.ctx.arc(s*0.2, s*0.2, 8, 0, Math.PI*2); this.ctx.fill();
+                                this.ctx.shadowBlur = 0;
+                                this.drawCB(s*0.2, s*0.2, cell.flows['out2_rendered']);
                             }
                         }
                     }
                 }
                 else if (cell.type === 'PORTAL') {
-                    this.ctx.fillStyle = "#a855f7";
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.4, 0, Math.PI*2); this.ctx.fill();
-                    this.ctx.fillStyle = "#1e293b";
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.3, 0, Math.PI*2); this.ctx.fill();
+                    // Teleportation Ring
+                    this.ctx.shadowBlur = 20; this.ctx.shadowColor = "#a855f7";
+                    this.ctx.strokeStyle = "#a855f7"; this.ctx.lineWidth = 4;
+                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI*2); this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                    
+                    // Rotating Inner portal
+                    this.ctx.rotate(this.time / 500);
+                    this.ctx.fillStyle = "#d8b4fe";
+                    this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.2); this.ctx.lineTo(s*0.15, s*0.1); this.ctx.lineTo(-s*0.15, s*0.1); this.ctx.fill();
                     
                     if(cell.flows && Object.keys(cell.flows).length > 0 && (!this.isFlowing || this.flowAnimationProgress > 30)) {
                         let c = Object.values(cell.flows)[0];
+                        this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[c];
                         this.ctx.fillStyle = this.colorMap[c];
-                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.shadowBlur = 0;
                         this.drawCB(0,0,c);
                     }
                 }
@@ -829,4 +981,13 @@ class HydraGame {
         }
     }
 }
-const game = new HydraGame();
+
+window.addEventListener('DOMContentLoaded', () => {
+    window.gameInstance = new HydraGame();
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('[PWA] Service Worker aktiv (Network-First)'))
+            .catch(err => console.error('[PWA] SW Fehler:', err));
+    }
+});
