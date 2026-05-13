@@ -289,7 +289,6 @@ class HydraGame {
             this.startLevel(this.currentLevel.id - 1);
         };
         
-        // FIX: The lightbulb now actually shows the hint!
         document.getElementById('btn-solution').onclick = () => {
             if (this.currentLevel && this.currentLevel.hint) {
                 alert("Tipp: " + this.currentLevel.hint);
@@ -416,23 +415,18 @@ class HydraGame {
             let node = queue.shift();
             let currentCell = this.grid[node.y][node.x];
             
-            // FIX: PORTAL LOGIC REWRITE
             if (currentCell && currentCell.type === 'PORTAL' && portals.length === 2) {
-                // Wenn wir aus einem Rohr INS Portal kommen
                 if (node.fromDir !== 'portal') {
                     let other = portals.find(p => p.x !== node.x || p.y !== node.y);
                     if (other) {
                         let otherCell = this.grid[other.y][other.x];
                         if(!otherCell.flows['out']) {
-                            otherCell.flows['out'] = node.color; // Färbe das andere Portal
-                            // Setze das ANDERE Portal in die Queue, markiert als aus einem Portal kommend!
+                            otherCell.flows['out'] = node.color; 
                             queue.push({x: other.x, y: other.y, color: node.color, fromDir: 'portal'});
                         }
                     }
-                    continue; // Breche hier ab, das EINGANGSPORTAL leitet nicht in angrenzende Rohre weiter
+                    continue; 
                 }
-                // Wenn fromDir === 'portal', lassen wir den Code ganz normal durchlaufen, 
-                // damit das Portal in angrenzende Rohre drückt!
             }
 
             let availableColors = null;
@@ -566,27 +560,25 @@ class HydraGame {
             let par = this.currentLevel.parClicks || 10;
             let earnedStars = 1;
             
-            // FIX: Stars only depend on number of placed parts vs par value
             if(this.clicks <= par) earnedStars = 3;
             else if(this.clicks <= par + 2) earnedStars = 2;
 
             const xp = this.currentLevel.xpReward;
             
-            // FIX: Store stars per level to display in UI later
             if (!this.playerStats.levelStars) this.playerStats.levelStars = {};
             let prevStars = this.playerStats.levelStars[this.currentLevel.id] || 0;
             
             if (earnedStars > prevStars) {
-                this.playerStats.stars += (earnedStars - prevStars); // Add only new stars
+                this.playerStats.stars += (earnedStars - prevStars); 
                 this.playerStats.levelStars[this.currentLevel.id] = earnedStars;
             }
             
             if (prevStars === 0) {
-                this.playerStats.xp += xp; // First time win
+                this.playerStats.xp += xp; 
             } else if (earnedStars > prevStars) {
-                this.playerStats.xp += Math.floor(xp * 0.5); // Better score reward
+                this.playerStats.xp += Math.floor(xp * 0.5); 
             } else {
-                this.playerStats.xp += 10; // Participation reward
+                this.playerStats.xp += 10; 
             }
             
             localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
