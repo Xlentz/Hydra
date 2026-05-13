@@ -662,13 +662,26 @@ class HydraGame {
         this.ctx.fill();
     }
 
-    drawSourcesAndTargets() {
+        drawSourcesAndTargets() {
         const s = this.cellSize;
         const hw = s / 2;
+        const pW = s * 0.35; // pipe width
+        const hPw = pW / 2;
         
         // Animated pulse effect
         const pulse = Math.sin(this.time / 300) * 0.1 + 0.9;
         
+        // Base Pipe Material (Metallic) for the stubs
+        const pipeGradientV = this.ctx.createLinearGradient(-hPw, 0, hPw, 0);
+        pipeGradientV.addColorStop(0, '#27272a');
+        pipeGradientV.addColorStop(0.5, '#3f3f46');
+        pipeGradientV.addColorStop(1, '#27272a');
+
+        const pipeGradientH = this.ctx.createLinearGradient(0, -hPw, 0, hPw);
+        pipeGradientH.addColorStop(0, '#27272a');
+        pipeGradientH.addColorStop(0.5, '#3f3f46');
+        pipeGradientH.addColorStop(1, '#27272a');
+
         this.currentLevel.sources.forEach(source => {
             const x = source.x * s; const y = source.y * s;
             const col = this.colorMap[source.color];
@@ -676,20 +689,32 @@ class HydraGame {
             this.ctx.save();
             this.ctx.translate(x + hw, y + hw);
             
+            // Draw connection stubs pointing outwards
+            // We check which direction has an open pipe to connect to, or just draw a cross base
+            this.ctx.fillStyle = pipeGradientH;
+            this.ctx.fillRect(-hw, -hPw, s, pW); // Horizontal base
+            this.ctx.fillStyle = pipeGradientV;
+            this.ctx.fillRect(-hPw, -hw, pW, s); // Vertical base
+            
+            // Central Connector Hub
+            this.ctx.fillStyle = "#18181b";
+            this.ctx.beginPath(); this.ctx.roundRect(-hPw-4, -hPw-4, pW+8, pW+8, 8); this.ctx.fill();
+            this.ctx.strokeStyle = "#3f3f46"; this.ctx.lineWidth = 2; this.ctx.stroke();
+
             // Outer glow ring
             this.ctx.shadowBlur = 20;
             this.ctx.shadowColor = col;
             this.ctx.strokeStyle = col;
             this.ctx.lineWidth = 4;
             this.ctx.beginPath(); 
-            this.ctx.arc(0, 0, s*0.4 * pulse, 0, Math.PI * 2); 
+            this.ctx.arc(0, 0, s*0.35 * pulse, 0, Math.PI * 2); 
             this.ctx.stroke();
             this.ctx.shadowBlur = 0;
             
             // Inner core
             this.ctx.fillStyle = col;
             this.ctx.beginPath(); 
-            this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); 
+            this.ctx.arc(0, 0, s*0.22, 0, Math.PI * 2); 
             this.ctx.fill();
             
             // Highlight
@@ -709,6 +734,17 @@ class HydraGame {
             this.ctx.save();
             this.ctx.translate(x + hw, y + hw);
             
+            // Draw connection stubs pointing outwards
+            this.ctx.fillStyle = pipeGradientH;
+            this.ctx.fillRect(-hw, -hPw, s, pW); // Horizontal base
+            this.ctx.fillStyle = pipeGradientV;
+            this.ctx.fillRect(-hPw, -hw, pW, s); // Vertical base
+
+            // Central Connector Hub
+            this.ctx.fillStyle = "#18181b";
+            this.ctx.beginPath(); this.ctx.roundRect(-hPw-4, -hPw-4, pW+8, pW+8, 8); this.ctx.fill();
+            this.ctx.strokeStyle = "#3f3f46"; this.ctx.lineWidth = 2; this.ctx.stroke();
+
             // Hexagon Target Receptacle
             this.ctx.shadowBlur = 10;
             this.ctx.shadowColor = reqCol;
@@ -718,8 +754,8 @@ class HydraGame {
             this.ctx.beginPath();
             for (let i = 0; i < 6; i++) {
                 const angle = 2 * Math.PI / 6 * i;
-                const hx = s * 0.45 * Math.cos(angle);
-                const hy = s * 0.45 * Math.sin(angle);
+                const hx = s * 0.4 * Math.cos(angle);
+                const hy = s * 0.4 * Math.sin(angle);
                 if (i === 0) this.ctx.moveTo(hx, hy);
                 else this.ctx.lineTo(hx, hy);
             }
@@ -729,7 +765,7 @@ class HydraGame {
             
             // Inner dark circle
             this.ctx.fillStyle = "#09090b";
-            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.3, 0, Math.PI * 2); this.ctx.fill();
 
             let isFilled = target.currentFlow;
             if(this.isFlowing && this.flowAnimationProgress < 90) isFilled = false;
@@ -740,7 +776,7 @@ class HydraGame {
                 this.ctx.shadowColor = fillCol;
                 this.ctx.fillStyle = fillCol;
                 this.ctx.beginPath(); 
-                this.ctx.arc(0, 0, s*0.3 * pulse, 0, Math.PI * 2); 
+                this.ctx.arc(0, 0, s*0.25 * pulse, 0, Math.PI * 2); 
                 this.ctx.fill();
                 this.ctx.shadowBlur = 0;
             } else {
@@ -748,7 +784,7 @@ class HydraGame {
                 this.ctx.strokeStyle = reqCol;
                 this.ctx.lineWidth = 2; 
                 this.ctx.setLineDash([4, 4]);
-                this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI * 2); this.ctx.stroke();
                 this.ctx.setLineDash([]);
             }
             
