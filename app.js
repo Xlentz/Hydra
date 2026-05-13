@@ -397,6 +397,9 @@ class HydraGame {
         let incomingDirs = [];
         const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
         
+        // Priority 1: Connect to active water flows
+        // Priority 2: Connect to existing pipes/sources
+        
         DIRS.forEach(move => {
             let nx = x + move.dx;
             let ny = y + move.dy;
@@ -411,7 +414,12 @@ class HydraGame {
                         let ports = this.getPorts(nCell);
                         let oppDir = (move.d + 2) % 4;
                         if (ports.includes(oppDir)) {
-                            incomingDirs.push(move.d);
+                            // If it has water flowing OUT towards us, add multiple times to increase weight
+                            if (nCell.flows && nCell.flows[oppDir]) {
+                                incomingDirs.push(move.d, move.d, move.d); 
+                            } else {
+                                incomingDirs.push(move.d);
+                            }
                         }
                     }
                 }
@@ -419,19 +427,21 @@ class HydraGame {
         });
 
         if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
-            if (incomingDirs.includes(1) || incomingDirs.includes(3)) return 1; 
+            let countH = incomingDirs.filter(d => d===1 || d===3).length;
+            let countV = incomingDirs.filter(d => d===0 || d===2).length;
+            if (countH > countV) return 1; 
             return 0; 
         }
         if (type === 'PIPE_ANGLE') {
-            if (incomingDirs.includes(0) && incomingDirs.includes(1)) return 0; 
-            if (incomingDirs.includes(1) && incomingDirs.includes(2)) return 1; 
-            if (incomingDirs.includes(2) && incomingDirs.includes(3)) return 2; 
-            if (incomingDirs.includes(3) && incomingDirs.includes(0)) return 3; 
+            let scores = [0,0,0,0]; // Rots: 0:TopRight, 1:RightBottom, 2:BottomLeft, 3:LeftTop
+            scores[0] = incomingDirs.filter(d=>d===0||d===1).length;
+            scores[1] = incomingDirs.filter(d=>d===1||d===2).length;
+            scores[2] = incomingDirs.filter(d=>d===2||d===3).length;
+            scores[3] = incomingDirs.filter(d=>d===3||d===0).length;
             
-            if (incomingDirs.includes(2)) return 1; 
-            if (incomingDirs.includes(3)) return 2; 
-            if (incomingDirs.includes(0)) return 3; 
-            if (incomingDirs.includes(1)) return 0; 
+            let maxScore = Math.max(...scores);
+            if(maxScore > 0) return scores.indexOf(maxScore);
+            return 0; 
         }
         return 0;
     }
@@ -863,8 +873,13 @@ class HydraGame {
                 const cell = this.grid[r][c];
                 if (!cell) {
                     // Draw subtle grid point
-                    this.ctx.fillStyle = "rgba(255,255,255,0.05)";
-                    this.ctx.beginPath(); this.ctx.arc(c*s + hw, r*s + hw, 2, 0, Math.PI*2); this.ctx.fill();
+                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.08)";
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.setLineDash([4, 4]);
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(c*s + 4, r*s + 4, s - 8, s - 8, 8);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
                     continue;
                 }
                 const x = c * s; const y = r * s;
