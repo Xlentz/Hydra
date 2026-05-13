@@ -365,14 +365,16 @@ class HydraGame {
                 }
             } else {
                 let p = false;
-                if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) { this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: 0 }; inv.pipes_straight--; p = true; }
-                else if (this.activeTool === 'PIPE_ANGLE' && inv.pipes_angle > 0) { this.grid[y][x] = { type: 'PIPE_ANGLE', rotation: 0 }; inv.pipes_angle--; p = true; }
+                let rot = this.getBestRotation(x, y, this.activeTool);
+                
+                if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) { this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: rot }; inv.pipes_straight--; p = true; }
+                else if (this.activeTool === 'PIPE_ANGLE' && inv.pipes_angle > 0) { this.grid[y][x] = { type: 'PIPE_ANGLE', rotation: rot }; inv.pipes_angle--; p = true; }
                 else if (this.activeTool === 'PIPE_CROSS' && inv.pipes_cross > 0) { this.grid[y][x] = { type: 'PIPE_CROSS', rotation: 0 }; inv.pipes_cross--; p = true; }
                 else if (this.activeTool === 'AND_GATE' && inv.andGates > 0) { this.grid[y][x] = { type: 'AND_GATE', rotation: 0 }; inv.andGates--; p = true; }
                 else if (this.activeTool === 'MIXER' && inv.mixers > 0) { this.grid[y][x] = { type: 'MIXER', rotation: 0 }; inv.mixers--; p = true; }
                 else if (this.activeTool === 'SPLITTER' && inv.splitters > 0) { this.grid[y][x] = { type: 'SPLITTER', rotation: 0 }; inv.splitters--; p = true; }
                 else if (this.activeTool === 'PORTAL' && inv.portals > 0) { this.grid[y][x] = { type: 'PORTAL', rotation: 0 }; inv.portals--; p = true; }
-                else if (this.activeTool === 'VALVE' && inv.valves > 0) { this.grid[y][x] = { type: 'VALVE', rotation: 0 }; inv.valves--; p = true; }
+                else if (this.activeTool === 'VALVE' && inv.valves > 0) { this.grid[y][x] = { type: 'VALVE', rotation: rot }; inv.valves--; p = true; }
                 
                 if(p) { this.audio.playClick(); this.clicks++; }
             }
@@ -388,6 +390,50 @@ class HydraGame {
         this.currentLevel.sources.forEach(s => { if(s.x === x && s.y === y) isST = true; });
         this.currentLevel.targets.forEach(t => { if(t.x === x && t.y === y) isST = true; });
         return isST;
+    }
+
+    
+    getBestRotation(x, y, type) {
+        let incomingDirs = [];
+        const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
+        
+        DIRS.forEach(move => {
+            let nx = x + move.dx;
+            let ny = y + move.dy;
+            if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
+                let isSource = this.currentLevel.sources.find(s => s.x === nx && s.y === ny);
+                let isTarget = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
+                if (isSource || isTarget) {
+                    incomingDirs.push(move.d);
+                } else {
+                    let nCell = this.grid[ny][nx];
+                    if (nCell && nCell.type !== 'WALL') {
+                        let ports = this.getPorts(nCell);
+                        let oppDir = (move.d + 2) % 4;
+                        if (ports.includes(oppDir)) {
+                            incomingDirs.push(move.d);
+                        }
+                    }
+                }
+            }
+        });
+
+        if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
+            if (incomingDirs.includes(1) || incomingDirs.includes(3)) return 1; 
+            return 0; 
+        }
+        if (type === 'PIPE_ANGLE') {
+            if (incomingDirs.includes(0) && incomingDirs.includes(1)) return 0; 
+            if (incomingDirs.includes(1) && incomingDirs.includes(2)) return 1; 
+            if (incomingDirs.includes(2) && incomingDirs.includes(3)) return 2; 
+            if (incomingDirs.includes(3) && incomingDirs.includes(0)) return 3; 
+            
+            if (incomingDirs.includes(2)) return 1; 
+            if (incomingDirs.includes(3)) return 2; 
+            if (incomingDirs.includes(0)) return 3; 
+            if (incomingDirs.includes(1)) return 0; 
+        }
+        return 0;
     }
 
     getPorts(cell) {
