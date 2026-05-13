@@ -394,11 +394,9 @@ class HydraGame {
 
     
     getBestRotation(x, y, type) {
-        let incomingDirs = [];
+        let connections = [false, false, false, false]; // top, right, bottom, left
+        let waterFlows = [false, false, false, false];
         const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
-        
-        // Priority 1: Connect to active water flows
-        // Priority 2: Connect to existing pipes/sources
         
         DIRS.forEach(move => {
             let nx = x + move.dx;
@@ -406,19 +404,22 @@ class HydraGame {
             if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
                 let isSource = this.currentLevel.sources.find(s => s.x === nx && s.y === ny);
                 let isTarget = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
-                if (isSource || isTarget) {
-                    incomingDirs.push(move.d);
+                
+                if (isSource) {
+                    connections[move.d] = true;
+                    waterFlows[move.d] = true; // Sources always have water
+                } else if (isTarget) {
+                    connections[move.d] = true;
                 } else {
                     let nCell = this.grid[ny][nx];
                     if (nCell && nCell.type !== 'WALL') {
                         let ports = this.getPorts(nCell);
                         let oppDir = (move.d + 2) % 4;
                         if (ports.includes(oppDir)) {
-                            // If it has water flowing OUT towards us, add multiple times to increase weight
+                            connections[move.d] = true;
+                            // Check if water is explicitly flowing OUT from that neighbor to us
                             if (nCell.flows && nCell.flows[oppDir]) {
-                                incomingDirs.push(move.d, move.d, move.d); 
-                            } else {
-                                incomingDirs.push(move.d);
+                                waterFlows[move.d] = true;
                             }
                         }
                     }
@@ -427,17 +428,21 @@ class HydraGame {
         });
 
         if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
-            let countH = incomingDirs.filter(d => d===1 || d===3).length;
-            let countV = incomingDirs.filter(d => d===0 || d===2).length;
-            if (countH > countV) return 1; 
-            return 0; 
+            // Horizontal vs Vertical
+            let scoreH = (connections[1]?1:0) + (connections[3]?1:0) + (waterFlows[1]?2:0) + (waterFlows[3]?2:0);
+            let scoreV = (connections[0]?1:0) + (connections[2]?1:0) + (waterFlows[0]?2:0) + (waterFlows[2]?2:0);
+            if (scoreH > scoreV) return 1; // Horizontal
+            return 0; // Vertical default
         }
+        
         if (type === 'PIPE_ANGLE') {
-            let scores = [0,0,0,0]; // Rots: 0:TopRight, 1:RightBottom, 2:BottomLeft, 3:LeftTop
-            scores[0] = incomingDirs.filter(d=>d===0||d===1).length;
-            scores[1] = incomingDirs.filter(d=>d===1||d===2).length;
-            scores[2] = incomingDirs.filter(d=>d===2||d===3).length;
-            scores[3] = incomingDirs.filter(d=>d===3||d===0).length;
+            let scores = [0,0,0,0]; // 0:TopRight, 1:RightBottom, 2:BottomLeft, 3:LeftTop
+            
+            // Score based on matching BOTH ports
+            scores[0] = (connections[0]?1:0) + (connections[1]?1:0) + (waterFlows[0]?3:0) + (waterFlows[1]?3:0);
+            scores[1] = (connections[1]?1:0) + (connections[2]?1:0) + (waterFlows[1]?3:0) + (waterFlows[2]?3:0);
+            scores[2] = (connections[2]?1:0) + (connections[3]?1:0) + (waterFlows[2]?3:0) + (waterFlows[3]?3:0);
+            scores[3] = (connections[3]?1:0) + (connections[0]?1:0) + (waterFlows[3]?3:0) + (waterFlows[0]?3:0);
             
             let maxScore = Math.max(...scores);
             if(maxScore > 0) return scores.indexOf(maxScore);
@@ -873,7 +878,7 @@ class HydraGame {
                 const cell = this.grid[r][c];
                 if (!cell) {
                     // Draw subtle grid point
-                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.08)";
+                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.2)";
                     this.ctx.lineWidth = 1.5;
                     this.ctx.setLineDash([4, 4]);
                     this.ctx.beginPath();
