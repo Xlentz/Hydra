@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydra-logic-v3'; // Version erhöht für sauberen Übergang
+const CACHE_NAME = 'hydra-logic-v4'; // Version erhöht für sauberen Übergang
 const ASSETS = [
   './',
   './index.html',
