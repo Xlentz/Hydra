@@ -1,6 +1,6 @@
 /**
  * HYDRA-LOGIC CORE ENGINE
- * Fokus: Gestochen scharfe Canvas-Skalierung, High-End Lichteffekte & Reparierte Avatar-Auswahl
+ * Fokus: Geschlossene Flüssigkeitsleitungen, High-End Geometrie & sichtbares Spielfeldgitter
  */
 
 class AudioEngine {
@@ -84,17 +84,16 @@ class HydraGame {
         this.flowAnimationProgress = 0; 
         this.animationTime = 0; 
         
-        // Die 15 Wunsch-Avatare
         this.avatars = ["🐭","👻","👽","👨🏻‍💼","🥷🏼","🧙🏻","👩🏻‍💼","🦊","🐵","🐶","🦁","🐯","🐰","🐙","⚽️"];
         this.selectedAvatarTemp = "🐭"; 
         
         this.colorMap = { 
-            'blue': '#06b6d4',   // Neon Cyan
-            'yellow': '#eab308', // Vibrant Gold
-            'red': '#ef4444',    // Laser Red
-            'green': '#10b981',  // Emerald Green
-            'purple': '#a855f7', // Electric Purple
-            'orange': '#f97316'  // Intense Orange
+            'blue': '#06b6d4',   
+            'yellow': '#eab308', 
+            'red': '#ef4444',    
+            'green': '#10b981',  
+            'purple': '#a855f7', 
+            'orange': '#f97316'  
         };
 
         this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
@@ -656,11 +655,11 @@ class HydraGame {
         if (!this.isFlowing) return;
         this.ctx.save();
         this.ctx.fillStyle = "#ffffff";
-        this.ctx.shadowBlur = 8;
+        this.ctx.shadowBlur = 6;
         this.ctx.shadowColor = color;
         
-        for (let i = 0; i < 3; i++) {
-            let offset = (this.animationTime * 0.3 + i * 0.33) % 1.0;
+        for (let i = 0; i < 2; i++) {
+            let offset = (this.animationTime * 0.4 + i * 0.5) % 1.0;
             let px = startX + (endX - startX) * offset;
             let py = startY + (endY - startY) * offset;
             this.ctx.beginPath();
@@ -670,89 +669,142 @@ class HydraGame {
         this.ctx.restore();
     }
 
+    // Hilfsfunktion: Zeichnet kleine metallische Verbindungsstutzen an offene Ports
+    drawPortFlange(cx, cy, direction, color = "#334155", glowHex = null) {
+        const s = this.cellSize;
+        this.ctx.save();
+        this.ctx.translate(cx, cy);
+        this.ctx.rotate(direction * Math.PI / 2);
+        
+        this.ctx.fillStyle = color;
+        if(glowHex && this.isFlowing) {
+            this.ctx.shadowBlur = 8;
+            this.ctx.shadowColor = glowHex;
+            this.ctx.fillStyle = glowHex;
+        }
+        // Zeichnet einen kleinen Flansch-Kopf am Zellenrand
+        this.ctx.fillRect(s * 0.4, -6, 4, 12);
+        this.ctx.restore();
+    }
+
     drawGrid() {
         const { cols, rows } = this.currentLevel.gridSize;
         const s = this.cellSize;
         
-        this.ctx.strokeStyle = "rgba(51, 65, 85, 0.15)";
-        this.ctx.lineWidth = 1;
-        for (let c = 0; c <= cols; c++) {
-            this.ctx.beginPath(); this.ctx.moveTo(c*s, 0); this.ctx.lineTo(c*s, rows*s); this.ctx.stroke();
-        }
-        for (let r = 0; r <= rows; r++) {
-            this.ctx.beginPath(); this.ctx.moveTo(0, r*s); this.ctx.lineTo(cols*s, r*s); this.ctx.stroke();
+        // 1. LABORTISCH-FLIESEN RENDERN (Sichtbare Platzierungsfelder)
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                this.ctx.fillStyle = "#111827"; // Dunkles Fliesen-Grau
+                this.ctx.strokeStyle = "#1e293b"; // Klare Grid-Begrenzung
+                this.ctx.lineWidth = 1.5;
+                this.ctx.fillRect(c * s + 2, r * s + 2, s - 4, s - 4);
+                this.ctx.strokeRect(c * s + 1, r * s + 1, s - 2, s - 2);
+                
+                // Tech-Ecken auf jeder Fliese für edlere Optik
+                this.ctx.fillStyle = "rgba(51, 65, 85, 0.3)";
+                this.ctx.fillRect(c * s + 4, r * s + 4, 3, 3);
+                this.ctx.fillRect(c * s + s - 7, r * s + 4, 3, 3);
+                this.ctx.fillRect(c * s + 4, r * s + s - 7, 3, 3);
+                this.ctx.fillRect(c * s + s - 7, r * s + s - 7, 3, 3);
+            }
         }
 
+        // 2. REAKTOR-QUELLEN RENDERN (Inklusive Richtungsflansche)
         this.currentLevel.sources.forEach(src => {
             let baseColor = this.colorMap[src.color] || "#ffffff";
-            let pulse = Math.sin(this.animationTime * 2) * 3;
-            
+            let pulse = Math.sin(this.animationTime * 2.5) * 2;
+            let cx = src.x * s + s * 0.5;
+            let cy = src.y * s + s * 0.5;
+
+            // Zeichne metallische Docking-Flansche ringsherum
+            for(let d=0; d<4; d++) this.drawPortFlange(cx, cy, d, "#475569", baseColor);
+
             this.ctx.save();
             this.ctx.strokeStyle = baseColor;
-            this.ctx.lineWidth = 2;
-            this.ctx.shadowBlur = 10 + pulse;
+            this.ctx.lineWidth = 3;
+            this.ctx.shadowBlur = 12 + pulse;
             this.ctx.shadowColor = baseColor;
-            this.ctx.strokeRect(src.x*s + s*0.1, src.y*s + s*0.1, s*0.8, s*0.8);
+            
+            // Abgerundetes Reaktorgehäuse
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, s * 0.35, 0, Math.PI * 2);
+            this.ctx.stroke();
             
             this.ctx.fillStyle = baseColor;
-            this.ctx.fillRect(src.x*s + s*0.25, src.y*s + s*0.25, s*0.5, s*0.5);
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, s * 0.18, 0, Math.PI * 2);
+            this.ctx.fill();
             this.ctx.restore();
-            
-            this.drawCB(src.x*s+s*0.5, src.y*s+s*0.5, src.color);
+
+            this.drawCB(cx, cy, src.color);
         });
 
+        // 3. ENERGIETANKS-ZIELE RENDERN (Eindeutige Einlaufstutzen)
         this.currentLevel.targets.forEach(tgt => {
             let baseColor = this.colorMap[tgt.requiredColor] || "#ffffff";
-            
+            let cx = tgt.x * s + s * 0.5;
+            let cy = tgt.y * s + s * 0.5;
+
+            // Flansche für das Ziel (Glühen nur bei befülltem Zustand)
+            for(let d=0; d<4; d++) this.drawPortFlange(cx, cy, d, "#334155", tgt.currentFlow ? this.colorMap[tgt.currentFlow] : null);
+
             this.ctx.save();
             this.ctx.strokeStyle = baseColor;
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = 2.5;
             
-            let tx = tgt.x * s; let ty = tgt.y * s;
-            let d = s * 0.15;
-            this.ctx.beginPath(); this.ctx.moveTo(tx+d, ty+d+10); this.ctx.lineTo(tx+d, ty+d); this.ctx.lineTo(tx+d+10, ty+d); this.ctx.stroke();
-            this.ctx.beginPath(); this.ctx.moveTo(tx+s-d, ty+d+10); this.ctx.lineTo(tx+s-d, ty+d); this.ctx.lineTo(tx+s-d-10, ty+d); this.ctx.stroke();
-            this.ctx.beginPath(); this.ctx.moveTo(tx+d, ty+s-d-10); this.ctx.lineTo(tx+d, ty+s-d); this.ctx.lineTo(tx+d+10, ty+s-d); this.ctx.stroke();
-            this.ctx.beginPath(); this.ctx.moveTo(tx+s-d, ty+s-d-10); this.ctx.lineTo(tx+s-d, ty+s-d); this.ctx.lineTo(tx+s-d-10, ty+s-d); this.ctx.stroke();
-
+            // Oktogonaler oder quadratischer Rahmen mit Fadenkreuz-Strichen
+            this.ctx.strokeRect(tgt.x*s + s*0.18, tgt.y*s + s*0.18, s*0.64, s*0.64);
+            
             this.ctx.beginPath();
-            this.ctx.arc(tx + s*0.5, ty + s*0.5, s*0.2, 0, Math.PI*2);
+            this.ctx.arc(cx, cy, s * 0.12, 0, Math.PI * 2);
             this.ctx.stroke();
 
             if(tgt.currentFlow) {
                 let currentHex = this.colorMap[tgt.currentFlow];
                 this.ctx.fillStyle = currentHex;
-                this.ctx.shadowBlur = 15;
+                this.ctx.shadowBlur = 16;
                 this.ctx.shadowColor = currentHex;
                 this.ctx.beginPath();
-                this.ctx.arc(tx + s*0.5, ty + s*0.5, s*0.15, 0, Math.PI*2);
+                this.ctx.arc(cx, cy, s * 0.22, 0, Math.PI * 2);
                 this.ctx.fill();
-                this.drawCB(tx+s*0.5, ty+s*0.5, tgt.currentFlow);
+                this.drawCB(cx, cy, tgt.currentFlow);
             }
             this.ctx.restore();
         });
 
+        // 4. VERBINDUNGSROHRE UND GATTER RENDERN (Wasserlücken komplett geschlossen)
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const cell = this.grid[r][c];
                 if (!cell) continue;
 
+                let cx = c * s + s * 0.5;
+                let cy = r * s + s * 0.5;
+
                 this.ctx.save();
-                this.ctx.translate(c*s + s*0.5, r*s + s*0.5);
+                this.ctx.translate(cx, cy);
 
                 if (cell.type === 'WALL') {
                     this.ctx.fillStyle = "#1e293b";
-                    this.ctx.strokeStyle = "#334155";
+                    this.ctx.strokeStyle = "#475569";
                     this.ctx.lineWidth = 2;
                     this.ctx.fillRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
                     this.ctx.strokeRect(-s*0.35, -s*0.35, s*0.7, s*0.7);
-                    
-                    this.ctx.fillStyle = "#475569";
+                    this.ctx.fillStyle = "#334155";
                     this.ctx.fillRect(-s*0.1, -s*0.1, s*0.2, s*0.2);
                 } 
                 else if (cell.type.startsWith('PIPE_')) {
                     this.ctx.rotate((cell.rotation || 0) * Math.PI / 2);
                     
+                    // Extraktion aller transportierten Farben zur Schließung von Darstellungs-Lücken
+                    let activeColors = [];
+                    if(cell.flows) {
+                        Object.values(cell.flows).forEach(color => {
+                            if(color && !activeColors.includes(color)) activeColors.push(color);
+                        });
+                    }
+
+                    // Metallummantelung (Das physische Rohr)
                     this.ctx.strokeStyle = "#334155"; this.ctx.lineWidth = 14; this.ctx.lineCap = "round";
                     if (cell.type === 'PIPE_STRAIGHT') {
                         this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
@@ -763,64 +815,39 @@ class HydraGame {
                         this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.lineTo(0, s*0.5); this.ctx.stroke();
                     }
 
-                    this.ctx.strokeStyle = "#1e293b"; this.ctx.lineWidth = 6;
-                    if (cell.type === 'PIPE_STRAIGHT') {
-                        this.ctx.stroke();
-                    } else if (cell.type === 'PIPE_ANGLE') {
-                        this.ctx.stroke();
-                    } else if (cell.type === 'PIPE_CROSS') {
-                        this.ctx.stroke();
-                    }
+                    // Rohr-Innenbett (Dunkles Glasvolumen)
+                    this.ctx.strokeStyle = "#0b0f19"; this.ctx.lineWidth = 6;
+                    if (cell.type === 'PIPE_STRAIGHT') this.ctx.stroke();
+                    else if (cell.type === 'PIPE_ANGLE') this.ctx.stroke();
+                    else if (cell.type === 'PIPE_CROSS') this.ctx.stroke();
 
-                    if (cell.flows) {
+                    // Fluss-Darstellung (Schließt Lücken durch bidirektionale Farberkennung)
+                    if (activeColors.length > 0 && (!this.isFlowing || this.flowAnimationProgress > 0)) {
+                        let primaryColor = activeColors[0]; // Nutze primär gefundene Transportfarbe
+                        let hex = this.colorMap[primaryColor];
+                        
+                        this.ctx.save();
+                        this.ctx.strokeStyle = hex; this.ctx.lineWidth = 5;
+                        this.ctx.shadowBlur = 12; this.ctx.shadowColor = hex;
+
                         if (cell.type === 'PIPE_STRAIGHT') {
-                            [1,3].forEach(d => {
-                                let f = cell.flows[d];
-                                if(f && (!this.isFlowing || this.flowAnimationProgress > 0)) {
-                                    let hex = this.colorMap[f];
-                                    this.ctx.save();
-                                    this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6;
-                                    this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
-                                    this.ctx.beginPath(); this.ctx.moveTo(d===3?-s*0.5:0, 0); this.ctx.lineTo(d===1?s*0.5:0, 0); this.ctx.stroke();
-                                    this.ctx.restore();
-                                    
-                                    this.drawFlowParticles(d===3?-s*0.5:0, 0, d===1?s*0.5:0, 0, hex);
-                                    this.drawCB(d===3?-s*0.25:s*0.25, 0, f);
-                                }
-                            });
+                            this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
+                            this.ctx.restore();
+                            this.drawFlowParticles(-s*0.5, 0, s*0.5, 0, hex);
+                            this.drawCB(-s*0.2, -3, primaryColor);
                         } 
                         else if (cell.type === 'PIPE_ANGLE') {
-                            if(cell.flows[0]) {
-                                let hex = this.colorMap[cell.flows[0]];
-                                this.ctx.save();
-                                this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6; this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
-                                this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.quadraticCurveTo(0,0, s*0.2, 0); this.ctx.stroke();
-                                this.ctx.restore();
-                                this.drawCB(0, -s*0.25, cell.flows[0]);
-                            }
-                            if(cell.flows[1]) {
-                                let hex = this.colorMap[cell.flows[1]];
-                                this.ctx.save();
-                                this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6; this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
-                                this.ctx.beginPath(); this.ctx.moveTo(s*0.5, 0); this.ctx.quadraticCurveTo(0,0, 0, -s*0.2); this.ctx.stroke();
-                                this.ctx.restore();
-                                this.drawCB(s*0.25, 0, cell.flows[1]);
-                            }
+                            this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.quadraticCurveTo(0,0, s*0.5, 0); this.ctx.stroke();
+                            this.ctx.restore();
+                            this.drawCB(s*0.15, -s*0.15, primaryColor);
                         } 
                         else if (cell.type === 'PIPE_CROSS') {
-                            const DIRS = [{dx:-s*0.5, dy:0, d:3}, {dx:s*0.5, dy:0, d:1}, {dx:0, dy:-s*0.5, d:0}, {dx:0, dy:s*0.5, d:2}];
-                            DIRS.forEach(dr => {
-                                if(cell.flows[dr.d]) {
-                                    let hex = this.colorMap[dr.d];
-                                    this.ctx.save();
-                                    this.ctx.strokeStyle = hex; this.ctx.lineWidth = 6;
-                                    this.ctx.shadowBlur = 10; this.ctx.shadowColor = hex;
-                                    this.ctx.beginPath(); this.ctx.moveTo(0,0); this.ctx.lineTo(dr.dx, dr.dy); this.ctx.stroke();
-                                    this.ctx.restore();
-                                    this.drawFlowParticles(0, 0, dr.dx, dr.dy, hex);
-                                    this.drawCB(dr.dx*0.5, dr.dy*0.5, cell.flows[dr.d]);
-                                }
-                            });
+                            this.ctx.beginPath(); this.ctx.moveTo(-s*0.5, 0); this.ctx.lineTo(s*0.5, 0); this.ctx.stroke();
+                            this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.5); this.ctx.lineTo(0, s*0.5); this.ctx.stroke();
+                            this.ctx.restore();
+                            this.drawFlowParticles(-s*0.5, 0, s*0.5, 0, hex);
+                            this.drawFlowParticles(0, -s*0.5, 0, s*0.5, hex);
+                            this.drawCB(0, 0, primaryColor);
                         }
                     }
                 } 
@@ -875,7 +902,6 @@ class HydraGame {
     }
 }
 
-// Globaler Instanzstarter & PWA Live-Update-Logik
 window.addEventListener('DOMContentLoaded', () => {
     window.gameInstance = new HydraGame();
 

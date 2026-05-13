@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydra-logic-v6'; // Version erhöht für sofortiges Zwangs-Update!
+const CACHE_NAME = 'hydra-logic-v7'; // Version erhöht für sofortiges Zwangs-Update!
 const ASSETS = [
   './',
   './index.html',
