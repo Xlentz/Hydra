@@ -104,7 +104,7 @@ class HydraGame {
         const gridW = this.currentLevel.gridSize.cols * this.cellSize;
         const gridH = this.currentLevel.gridSize.rows * this.cellSize;
         this.offsetX = (this.canvas.width - gridW) / 2;
-        this.offsetY = (this.canvas.height - gridH) / 2 - 50; 
+        this.offsetY = (this.canvas.height - gridH) / 2 - 110; 
     }
 
     updateUI() {
@@ -483,7 +483,7 @@ class HydraGame {
 
         let queue = [];
         this.currentLevel.sources.forEach(s => {
-            queue.push({x: s.x, y: s.y, color: s.color, fromDir: null});
+            queue.push({x: s.x, y: s.y, color: s.color, fromDir: null, dist: 0, dist: node.dist + 1});
         });
 
         let iters = 0;
@@ -501,7 +501,7 @@ class HydraGame {
                         let otherCell = this.grid[other.y][other.x];
                         if(!otherCell.flows['out']) {
                             otherCell.flows['out'] = node.color; 
-                            queue.push({x: other.x, y: other.y, color: node.color, fromDir: 'portal'});
+                            queue.push({x: other.x, y: other.y, color: node.color, fromDir: 'portal', dist: node.dist + 1});
                         }
                     }
                     continue; 
@@ -564,16 +564,18 @@ class HydraGame {
                         if(cell.flows[move.d] === emitColor) return; 
                         
                         if (cell.type.startsWith('PIPE') || cell.type === 'PORTAL') {
-                            cell.flows[move.d] = emitColor; 
-                            queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
+                            cell.flows[move.d] = emitColor;
+                            cell.flowDist = node.dist + 1; 
+                            queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
                             consumeSplit();
                         }
                         else if (cell.type === 'VALVE') {
                             cell.flows[move.d] = emitColor;
+                            cell.flowDist = node.dist + 1;
                             let r = cell.rotation || 0;
                             let inline = (r%2===0) ? [1,3] : [0,2];
                             if(inline.includes(move.d)) {
-                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
                             }
                             consumeSplit();
                         }
@@ -583,7 +585,7 @@ class HydraGame {
                             
                             if (cell.inputOrigins.size >= 2) {
                                 cell.flows['out'] = cell.inputs[0]; 
-                                queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: null});
+                                queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: null, dist: node.dist + 1});
                             }
                             consumeSplit();
                         }
@@ -594,7 +596,7 @@ class HydraGame {
                             if (cell.inputOrigins.size >= 2) {
                                 let mixed = this.mixColors(cell.inputs[0], cell.inputs[1]);
                                 cell.flows['out'] = mixed;
-                                queue.push({x: nx, y: ny, color: mixed, fromDir: null});
+                                queue.push({x: nx, y: ny, color: mixed, fromDir: null, dist: node.dist + 1});
                             } else {
                                 cell.flows['out'] = cell.inputs[0];
                             }
@@ -604,9 +606,9 @@ class HydraGame {
                             cell.inputOrigins.add(move.d);
                             let unmix = this.unmixColor(emitColor);
                             if(unmix.length === 2) {
-                                queue.push({x: nx, y: ny, color: 'split_trigger', colors: unmix, fromDir: move.d});
+                                queue.push({x: nx, y: ny, color: \'split_trigger\', colors: unmix, fromDir: move.d, dist: node.dist + 1, dist: node.dist + 1});
                             } else {
-                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d});
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
                             }
                             consumeSplit();
                         }
@@ -900,7 +902,14 @@ class HydraGame {
                         const fillCol = this.colorMap[wCol];
                         this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
                         this.ctx.fillStyle = fillCol; 
-                        let l = this.isFlowing ? (this.flowAnimationProgress/100)*s : s;
+                        
+                        let localProgress = 1;
+                        if(this.isFlowing) {
+                            let startAnim = (cell.flowDist || 0) * 3; 
+                            localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                        }
+                        let l = localProgress * s;
+
                         this.ctx.fillRect(-hw, -hPw + 6, l, pW - 12); 
                         this.ctx.shadowBlur = 0;
                         
@@ -928,7 +937,14 @@ class HydraGame {
                         const fillCol = this.colorMap[wCol];
                         this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
                         this.ctx.fillStyle = fillCol;
-                        let scale = this.isFlowing ? (this.flowAnimationProgress/100) : 1;
+                        
+                        let localProgress = 1;
+                        if(this.isFlowing) {
+                            let startAnim = (cell.flowDist || 0) * 3; 
+                            localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                        }
+                        let scale = localProgress;
+
                         this.ctx.fillRect(-hPw + 6, -hw, pW - 12, (hw + hPw - 6)*scale);
                         this.ctx.fillRect(-hPw + 6, -hPw + 6, (hw + hPw - 6)*scale, pW - 12);
                         this.ctx.shadowBlur = 0;
@@ -946,7 +962,14 @@ class HydraGame {
                     
                     let flowV = (cell.flows && (cell.flows[0] || cell.flows[2]));
                     let flowH = (cell.flows && (cell.flows[1] || cell.flows[3]));
-                    let animP = this.isFlowing ? (this.flowAnimationProgress/100)*s : s;
+                    
+                    let localProgress = 1;
+                    if(this.isFlowing) {
+                        let startAnim = (cell.flowDist || 0) * 3; 
+                        localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                    }
+                    let animP = localProgress * s;
+
                     
                     if(flowV && (!this.isFlowing || this.flowAnimationProgress > 10)) { 
                         this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[flowV];
