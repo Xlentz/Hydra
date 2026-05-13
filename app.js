@@ -112,6 +112,7 @@ class HydraGame {
         
         setEl('player-name', this.playerStats.name);
         setEl('header-avatar', this.playerStats.avatar);
+        setEl('player-xp-header', this.playerStats.xp + ' XP');
         setEl('player-xp', this.playerStats.xp);
         setEl('player-stars', this.playerStats.stars);
         

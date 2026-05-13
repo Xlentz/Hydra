@@ -70,28 +70,22 @@
 
     <header class="p-3 glass-effect flex justify-between items-center z-10 shrink-0 border-b border-zinc-800/50">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(2,132,199,0.5)] flex items-center justify-center bg-gradient-to-br from-cyan-500 to-blue-600 hidden sm:flex border border-cyan-400/30">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            </div>
-            <div>
-                <h1 class="text-lg font-black tracking-wider leading-none bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-md">HYDRA</h1>
-                <p class="text-[10px] text-zinc-400 tracking-widest uppercase font-semibold" id="header-level-info">Level 0</p>
+            <img src="logo.png" alt="Hydra" class="w-12 h-12 rounded-xl shadow-[0_0_15px_rgba(2,132,199,0.5)] object-cover border border-cyan-400/30">
+            <div class="hidden sm:block">
+                <p class="text-xs text-zinc-400 tracking-widest uppercase font-bold" id="header-level-info">Level 0</p>
             </div>
         </div>
         
-        <div class="flex gap-4 items-center">
-            <button id="btn-open-profile" class="flex items-center gap-3 hover:bg-zinc-800/80 p-1.5 pr-3 rounded-full transition-all border border-zinc-700/50 hover:border-cyan-500/50 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]">
-                <div id="header-avatar" class="text-2xl bg-zinc-800 rounded-full w-9 h-9 flex items-center justify-center shadow-inner border border-zinc-700">👽</div>
-                <div class="text-right hidden sm:block">
-                    <div class="text-xs font-bold text-zinc-100" id="player-name">Gast</div>
-                    <div class="flex items-center gap-1 justify-end">
-                        <span id="player-stars" class="font-bold text-yellow-400 text-[10px]">0</span>
-                        <svg class="w-2.5 h-2.5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    </div>
+        <div class="flex gap-3 items-center">
+            <button id="btn-open-profile" class="flex items-center gap-3 hover:bg-zinc-800/80 p-1.5 pr-4 rounded-full transition-all border border-zinc-700/50 hover:border-cyan-500/50 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                <div id="header-avatar" class="text-2xl bg-zinc-800 rounded-full w-10 h-10 flex items-center justify-center shadow-inner border border-zinc-700">👽</div>
+                <div class="text-right">
+                    <div class="text-sm font-bold text-zinc-100 leading-tight" id="player-name">Gast</div>
+                    <div class="text-[11px] font-black text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.4)] tracking-wider mt-0.5" id="player-xp-header">0 XP</div>
                 </div>
             </button>
             <button id="menu-btn" class="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700" onclick="location.reload()">
-                <svg class="w-5 h-5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+                <svg class="w-6 h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
             </button>
         </div>
     </header>
