@@ -101,11 +101,22 @@ class HydraGame {
     }
 
     centerGrid() {
-        const gridW = this.currentLevel.gridSize.cols * this.cellSize;
-        const gridH = this.currentLevel.gridSize.rows * this.cellSize;
-        this.offsetX = (this.canvas.width - gridW) / 2;
-        let usableHeight = this.canvas.height - 180; 
-        this.offsetY = (usableHeight - gridH) / 2 + 30; 
+        if (!this.currentLevel) return;
+        const cols = this.currentLevel.gridSize.cols;
+        const rows = this.currentLevel.gridSize.rows;
+        
+        let usableHeight = this.canvas.height - 180;
+        if(usableHeight < 300) usableHeight = 300;
+        
+        // Guarantee that the grid fits both horizontally and vertically, with 40px padding on width
+        this.cellSize = Math.floor(Math.min((this.canvas.width - 40) / cols, usableHeight / rows));
+        if (this.cellSize > 85) this.cellSize = 85;
+        
+        const gridW = cols * this.cellSize;
+        const gridH = rows * this.cellSize;
+        
+        this.offsetX = Math.floor((this.canvas.width - gridW) / 2);
+        this.offsetY = Math.floor((usableHeight - gridH) / 2 + 50); 
     }
 
     updateUI() {
