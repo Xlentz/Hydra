@@ -72,7 +72,13 @@
         <div class="flex items-center gap-3">
             <img src="logo.png" alt="Hydra" class="w-12 h-12 rounded-xl shadow-[0_0_15px_rgba(2,132,199,0.5)] object-cover border border-cyan-400/30">
             <div class="flex flex-col justify-center">
-                <p class="text-sm sm:text-xs text-cyan-400 tracking-widest uppercase font-black drop-shadow-[0_0_5px_rgba(34,211,238,0.3)]" id="header-level-info" class="text-sm sm:text-xs text-cyan-400 tracking-widest uppercase font-black drop-shadow-[0_0_5px_rgba(34,211,238,0.3)] whitespace-nowrap">Sektor 0</p>
+                <p class="text-sm sm:text-xs text-cyan-400 tracking-widest uppercase font-black drop-shadow-[0_0_5px_rgba(34,211,238,0.3)] whitespace-nowrap" id="header-level-info">Sektor 0</p>
+                <div class="flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                    <span class="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Teile:</span>
+                    <span id="click-counter" class="text-white font-black text-[10px] sm:text-xs">0</span>
+                    <span class="text-zinc-600 text-[10px] sm:text-xs">/</span>
+                    <span id="par-clicks" class="text-yellow-400 font-bold text-[10px] sm:text-xs">0</span>
+                </div>
             </div>
         </div>
         
@@ -99,9 +105,7 @@
         </div>
 
         <div id="game-controls" class="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-[95%] max-w-2xl hidden pointer-events-auto z-10">
-            <div class="flex justify-center items-center px-4 py-2 bg-zinc-900/90 rounded-full border border-zinc-700/50 backdrop-blur-md self-center shadow-[0_4px_20px_rgba(0,0,0,0.5)] whitespace-nowrap">
-                <span class="text-[10px] sm:text-xs text-zinc-400 tracking-wider font-semibold uppercase">Teile verbaut: <span id="click-counter" class="text-white font-black text-xs sm:text-sm ml-1">0</span> <span class="text-zinc-600 mx-1">/</span> <span id="par-clicks" class="text-yellow-400 font-bold text-xs sm:text-sm">0</span></span>
-            </div>
+            
             
             <div class="glass-effect p-2.5 rounded-2xl flex justify-start items-center px-3 gap-3 border border-zinc-800 overflow-x-auto pb-2.5 shadow-2xl">
                 <button class="tool-btn active shrink-0 w-[70px] h-[70px] rounded-xl border border-zinc-700 transition-all text-xs font-bold shadow-lg flex flex-col items-center justify-center text-zinc-300" data-tool="PIPE_STRAIGHT" id="btn-t-straight">

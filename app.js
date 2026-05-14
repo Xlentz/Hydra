@@ -1009,12 +1009,14 @@ class HydraGame {
                 const cell = this.grid[r][c];
                 if (!cell) {
                     // Draw subtle grid point
-                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.2)";
+                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.4)";
                     this.ctx.lineWidth = 1.5;
+                    this.ctx.fillStyle = "rgba(6, 182, 212, 0.05)";
                     this.ctx.setLineDash([4, 4]);
                     this.ctx.beginPath();
                     this.ctx.roundRect(c*s + 4, r*s + 4, s - 8, s - 8, 8);
                     this.ctx.stroke();
+                    this.ctx.fill();
                     this.ctx.setLineDash([]);
                     continue;
                 }
