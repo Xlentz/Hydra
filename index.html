@@ -90,9 +90,7 @@
                     <div class="text-[10px] sm:text-[11px] font-black text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.4)] tracking-wider mt-1" id="player-xp-header">0 XP</div>
                 </div>
             </button>
-            <button id="menu-btn" class="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700 shrink-0" onclick="location.reload()">
-                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
-            </button>
+            <button id="menu-btn" class="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700 shrink-0 text-xl sm:text-2xl flex items-center justify-center" >🏠</button>
         </div>
     </header>
 
@@ -101,7 +99,16 @@
 
         <div id="level-selection" class="absolute inset-0 z-20 bg-zinc-950/95 flex flex-col items-center p-6 transition-all duration-500 overflow-y-auto backdrop-blur-xl">
             
-            <div id="level-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-5 w-full max-w-6xl pb-10"></div>
+            
+            
+            <div class="flex justify-between items-center mb-6 bg-zinc-900/50 p-2 sm:p-3 rounded-2xl border border-zinc-800">
+                <button id="btn-prev-page" class="p-2 sm:px-4 sm:py-2 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md">◀ Zurück</button>
+                <span id="page-indicator" class="text-white font-black text-sm sm:text-base tracking-widest uppercase">Sektor 1 - 40</span>
+                <button id="btn-next-page" class="p-2 sm:px-4 sm:py-2 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md">Weiter ▶</button>
+            </div>
+            <div id="level-grid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 sm:gap-4 pb-20"></div>
+
+
         </div>
 
         <div id="game-controls" class="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-[95%] max-w-2xl hidden pointer-events-auto z-10">
@@ -232,8 +239,11 @@
             
             <div class="flex gap-4">
                 <button id="btn-close-profile" class="flex-1 py-4 bg-zinc-800 rounded-xl text-sm font-black hover:bg-zinc-700 transition-colors uppercase tracking-wider text-zinc-300">Schließen</button>
-                <button id="btn-save-profile" class="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl text-sm font-black hover:scale-105 transition-transform text-white shadow-[0_0_15px_rgba(6,182,212,0.4)] uppercase tracking-wider">Speichern</button>
+                
+                <button id="btn-save-profile" class="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl text-sm font-black text-white hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] uppercase tracking-wider">Speichern</button>
             </div>
+            <button id="btn-reset-progress" class="w-full mt-4 py-3 bg-red-900/30 border border-red-500/50 rounded-xl text-xs font-bold hover:bg-red-900/50 transition-colors uppercase tracking-wider text-red-400">🚨 Fortschritt zurücksetzen</button>
+
         </div>
     </div>
 

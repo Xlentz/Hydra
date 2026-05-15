@@ -181,15 +181,54 @@ class HydraGame {
     renderLevelList() {
         const grid = document.getElementById('level-grid');
         grid.innerHTML = '';
-        HYDRA_LEVELS.forEach((level, index) => {
+        
+        this.currentPage = this.currentPage || 0;
+        const perPage = 40;
+        const totalPages = Math.ceil(HYDRA_LEVELS.length / perPage);
+        
+        let startIdx = this.currentPage * perPage;
+        let endIdx = Math.min(startIdx + perPage, HYDRA_LEVELS.length);
+
+        const pageInd = document.getElementById('page-indicator');
+        if(pageInd) pageInd.textContent = `Sektor ${startIdx + 1} - ${endIdx}`;
+        
+        const prevBtn = document.getElementById('btn-prev-page');
+        const nextBtn = document.getElementById('btn-next-page');
+        
+        if (prevBtn && nextBtn) {
+            const newPrev = prevBtn.cloneNode(true);
+            prevBtn.parentNode.replaceChild(newPrev, prevBtn);
+            const newNext = nextBtn.cloneNode(true);
+            nextBtn.parentNode.replaceChild(newNext, nextBtn);
+            
+            newPrev.disabled = this.currentPage === 0;
+            newNext.disabled = this.currentPage === totalPages - 1;
+            
+            newPrev.addEventListener('click', () => {
+                if(this.currentPage > 0) {
+                    this.currentPage--;
+                    this.renderLevelList();
+                }
+            });
+            
+            newNext.addEventListener('click', () => {
+                if(this.currentPage < totalPages - 1) {
+                    this.currentPage++;
+                    this.renderLevelList();
+                }
+            });
+        }
+
+        for(let i = startIdx; i < endIdx; i++) {
+            const level = HYDRA_LEVELS[i];
             const btn = document.createElement('button');
             
             let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[level.id] || 0) : 0;
             let starHtml = '';
             if (stars > 0) {
                 starHtml = `<div class="flex mt-1">`;
-                for(let i=0; i<3; i++) {
-                    starHtml += `<svg class="w-3.5 h-3.5 ${i<stars ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'text-zinc-700'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+                for(let j=0; j<3; j++) {
+                    starHtml += `<svg class="w-3.5 h-3.5 ${j<stars ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'text-zinc-700'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
                 }
                 starHtml += `</div>`;
             }
@@ -198,9 +237,9 @@ class HydraGame {
             
             btn.className = `h-20 flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
             btn.innerHTML = `<span class="text-2xl ${isCompleted ? 'text-cyan-300' : 'text-zinc-500'}">${level.id}</span>${starHtml}`;
-            btn.onclick = () => this.startLevel(index);
+            btn.onclick = () => this.startLevel(i);
             grid.appendChild(btn);
-        });
+        }
     }
 
     startLevel(index) {
@@ -1272,3 +1311,15 @@ window.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('[PWA] SW Fehler:', err));
     }
 });
+
+        const menuBtn = document.getElementById('menu-btn');
+        if(menuBtn && window.gameInstance) {
+            menuBtn.addEventListener('click', () => {
+                document.getElementById('game-controls').classList.add('hidden');
+                document.getElementById('level-selection').classList.remove('hidden');
+                if(window.gameInstance.renderLevelList) {
+                    window.gameInstance.renderLevelList();
+                }
+            });
+        }
+        
