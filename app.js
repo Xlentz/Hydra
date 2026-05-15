@@ -402,13 +402,12 @@ class HydraGame {
 
     
         getBestRotation(x, y, type) {
-        let n = [false, false, false, false]; // Connections [Top, Right, Bottom, Left]
-        let w = [false, false, false, false]; // Water flowing into this cell
-        let targets_dir = [false, false, false, false]; // Direction of targets
+        let n = [false, false, false, false]; 
+        let w = [false, false, false, false]; 
+        let targets_dir = [false, false, false, false]; 
         
         const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
         
-        // 1. Scan immediate neighbors for pipes and water flows
         DIRS.forEach(move => {
             let nx = x + move.dx; let ny = y + move.dy;
             if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
@@ -423,7 +422,6 @@ class HydraGame {
                         let oppDir = (move.d + 2) % 4;
                         if (ports.includes(oppDir)) {
                             n[move.d] = true;
-                            // Check if water is flowing OUT from neighbor INTO our cell
                             if (nCell.flows && nCell.flows[oppDir]) w[move.d] = true;
                         }
                     }
@@ -431,48 +429,38 @@ class HydraGame {
             }
         });
 
-        // 2. Target magnetism (global direction)
         let tx = 0, ty = 0;
         if(this.currentLevel.targets.length > 0) {
             this.currentLevel.targets.forEach(t => { tx += t.x; ty += t.y; });
             tx /= this.currentLevel.targets.length; ty /= this.currentLevel.targets.length;
             let dx = tx - x; let dy = ty - y;
             if (Math.abs(dy) >= Math.abs(dx)) {
-                if (dy < 0) targets_dir[0] = true; // Up
-                if (dy > 0) targets_dir[2] = true; // Down
+                if (dy < 0) targets_dir[0] = true; 
+                if (dy > 0) targets_dir[2] = true; 
             }
             if (Math.abs(dx) >= Math.abs(dy)) {
-                if (dx > 0) targets_dir[1] = true; // Right
-                if (dx < 0) targets_dir[3] = true; // Left
+                if (dx > 0) targets_dir[1] = true; 
+                if (dx < 0) targets_dir[3] = true; 
             }
         }
 
         if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
-            // Priority 1: Water flow direction
-            if (w[1] || w[3]) return 1; // horizontal
-            if (w[0] || w[2]) return 0; // vertical
-            // Priority 2: Existing connections
+            if (w[1] || w[3]) return 1; 
+            if (w[0] || w[2]) return 0; 
             if (n[1] || n[3]) return 1;
             if (n[0] || n[2]) return 0;
-            // Priority 3: Target direction
             if (targets_dir[1] || targets_dir[3]) return 1;
             return 0; 
         }
         
         if (type === 'PIPE_ANGLE') {
-            let scores = [0,0,0,0]; // 0: Top-Right, 1: Right-Bottom, 2: Bottom-Left, 3: Left-Top
-            
-            // Function to evaluate a specific rotation (requires 2 ports)
+            let scores = [0,0,0,0]; 
             let evaluateRotation = (p1, p2) => {
                 let score = 0;
-                // Massive bonus if it catches incoming water
                 if (w[p1] || w[p2]) score += 50; 
-                // Penalty if neither port connects to a known neighbor when neighbors exist
                 if (n.some(val=>val) && !n[p1] && !n[p2]) score -= 20;
-                // Bonus for connecting to existing pipes
                 if (n[p1]) score += 10;
                 if (n[p2]) score += 10;
-                // Bonus for pointing towards the target
                 if (targets_dir[p1]) score += 5;
                 if (targets_dir[p2]) score += 5;
                 return score;
@@ -492,42 +480,6 @@ class HydraGame {
             if (w[0]) return 0; if (w[1]) return 1; if (w[2]) return 2; if (w[3]) return 3;
             if (n[0]) return 0; if (n[1]) return 1; if (n[2]) return 2; if (n[3]) return 3;
             return 0;
-        }
-        
-        return 0;
-    }
-        
-        if (type === 'PIPE_ANGLE') {
-            let scores = [0,0,0,0];
-            let val = (dir) => (w[dir] ? 10 : (n[dir] ? 1 : 0));
-            scores[0] = val(0) + val(1);
-            scores[1] = val(1) + val(2);
-            scores[2] = val(2) + val(3);
-            scores[3] = val(3) + val(0);
-            
-            let maxScore = Math.max(...scores);
-            if(maxScore > 0) {
-                let bestRots = [];
-                for(let i=0; i<4; i++) if(scores[i] === maxScore) bestRots.push(i);
-                if (bestRots.length === 1) return bestRots[0];
-                
-                let tx = 0, ty = 0;
-                this.currentLevel.targets.forEach(t => { tx += t.x; ty += t.y; });
-                tx /= this.currentLevel.targets.length; ty /= this.currentLevel.targets.length;
-                let dx = tx - x; let dy = ty - y;
-                
-                let preferredDirs = [];
-                if (dx > 0) preferredDirs.push(1); if (dx < 0) preferredDirs.push(3);
-                if (dy > 0) preferredDirs.push(2); if (dy < 0) preferredDirs.push(0);
-                
-                const rotDirs = [[0,1], [1,2], [2,3], [3,0]];
-                for (let r of bestRots) {
-                    let dirsForR = rotDirs[r];
-                    if (preferredDirs.includes(dirsForR[0]) || preferredDirs.includes(dirsForR[1])) return r;
-                }
-                return bestRots[0];
-            }
-            return 0; 
         }
         return 0;
     }
@@ -588,100 +540,60 @@ class HydraGame {
 
     
     getBestRotation(x, y, type) {
-        let n = [false, false, false, false]; // Connections [Top, Right, Bottom, Left]
-        let w = [false, false, false, false]; // Water flowing into this cell
-        let targets_dir = [false, false, false, false]; // Direction of targets
-        
+        let connections = [false, false, false, false]; // top, right, bottom, left
+        let waterFlows = [false, false, false, false];
         const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
         
-        // 1. Scan immediate neighbors for pipes and water flows
         DIRS.forEach(move => {
-            let nx = x + move.dx; let ny = y + move.dy;
+            let nx = x + move.dx;
+            let ny = y + move.dy;
             if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
                 let isSource = this.currentLevel.sources.find(s => s.x === nx && s.y === ny);
                 let isTarget = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
-                if (isSource) { n[move.d] = true; w[move.d] = true; } 
-                else if (isTarget) { n[move.d] = true; targets_dir[move.d] = true; } 
-                else {
+                
+                if (isSource) {
+                    connections[move.d] = true;
+                    waterFlows[move.d] = true; // Sources always have water
+                } else if (isTarget) {
+                    connections[move.d] = true;
+                } else {
                     let nCell = this.grid[ny][nx];
                     if (nCell && nCell.type !== 'WALL') {
                         let ports = this.getPorts(nCell);
                         let oppDir = (move.d + 2) % 4;
                         if (ports.includes(oppDir)) {
-                            n[move.d] = true;
-                            // Check if water is flowing OUT from neighbor INTO our cell
-                            if (nCell.flows && nCell.flows[oppDir]) w[move.d] = true;
+                            connections[move.d] = true;
+                            // Check if water is explicitly flowing OUT from that neighbor to us
+                            if (nCell.flows && nCell.flows[oppDir]) {
+                                waterFlows[move.d] = true;
+                            }
                         }
                     }
                 }
             }
         });
 
-        // 2. Target magnetism (global direction)
-        let tx = 0, ty = 0;
-        if(this.currentLevel.targets.length > 0) {
-            this.currentLevel.targets.forEach(t => { tx += t.x; ty += t.y; });
-            tx /= this.currentLevel.targets.length; ty /= this.currentLevel.targets.length;
-            let dx = tx - x; let dy = ty - y;
-            if (Math.abs(dy) >= Math.abs(dx)) {
-                if (dy < 0) targets_dir[0] = true; // Up
-                if (dy > 0) targets_dir[2] = true; // Down
-            }
-            if (Math.abs(dx) >= Math.abs(dy)) {
-                if (dx > 0) targets_dir[1] = true; // Right
-                if (dx < 0) targets_dir[3] = true; // Left
-            }
-        }
-
         if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
-            // Priority 1: Water flow direction
-            if (w[1] || w[3]) return 1; // horizontal
-            if (w[0] || w[2]) return 0; // vertical
-            // Priority 2: Existing connections
-            if (n[1] || n[3]) return 1;
-            if (n[0] || n[2]) return 0;
-            // Priority 3: Target direction
-            if (targets_dir[1] || targets_dir[3]) return 1;
-            return 0; 
+            // Horizontal vs Vertical
+            let scoreH = (connections[1]?1:0) + (connections[3]?1:0) + (waterFlows[1]?2:0) + (waterFlows[3]?2:0);
+            let scoreV = (connections[0]?1:0) + (connections[2]?1:0) + (waterFlows[0]?2:0) + (waterFlows[2]?2:0);
+            if (scoreH > scoreV) return 1; // Horizontal
+            return 0; // Vertical default
         }
         
         if (type === 'PIPE_ANGLE') {
-            let scores = [0,0,0,0]; // 0: Top-Right, 1: Right-Bottom, 2: Bottom-Left, 3: Left-Top
+            let scores = [0,0,0,0]; // 0:TopRight, 1:RightBottom, 2:BottomLeft, 3:LeftTop
             
-            // Function to evaluate a specific rotation (requires 2 ports)
-            let evaluateRotation = (p1, p2) => {
-                let score = 0;
-                // Massive bonus if it catches incoming water
-                if (w[p1] || w[p2]) score += 50; 
-                // Penalty if neither port connects to a known neighbor when neighbors exist
-                if (n.some(val=>val) && !n[p1] && !n[p2]) score -= 20;
-                // Bonus for connecting to existing pipes
-                if (n[p1]) score += 10;
-                if (n[p2]) score += 10;
-                // Bonus for pointing towards the target
-                if (targets_dir[p1]) score += 5;
-                if (targets_dir[p2]) score += 5;
-                return score;
-            };
-
-            scores[0] = evaluateRotation(0, 1);
-            scores[1] = evaluateRotation(1, 2);
-            scores[2] = evaluateRotation(2, 3);
-            scores[3] = evaluateRotation(3, 0);
+            // Score based on matching BOTH ports
+            scores[0] = (connections[0]?1:0) + (connections[1]?1:0) + (waterFlows[0]?3:0) + (waterFlows[1]?3:0);
+            scores[1] = (connections[1]?1:0) + (connections[2]?1:0) + (waterFlows[1]?3:0) + (waterFlows[2]?3:0);
+            scores[2] = (connections[2]?1:0) + (connections[3]?1:0) + (waterFlows[2]?3:0) + (waterFlows[3]?3:0);
+            scores[3] = (connections[3]?1:0) + (connections[0]?1:0) + (waterFlows[3]?3:0) + (waterFlows[0]?3:0);
             
             let maxScore = Math.max(...scores);
-            return scores.indexOf(maxScore);
+            if(maxScore > 0) return scores.indexOf(maxScore);
+            return 0; 
         }
-        
-        if (type === 'PIPE_CROSS' || type === 'MIXER') return 0;
-        if (type === 'SPLITTER') {
-            if (w[0]) return 0; if (w[1]) return 1; if (w[2]) return 2; if (w[3]) return 3;
-            if (n[0]) return 0; if (n[1]) return 1; if (n[2]) return 2; if (n[3]) return 3;
-            return 0;
-        }
-        
-        return 0;
-    }
         return 0;
     }
 
