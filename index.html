@@ -101,7 +101,16 @@
 
         <div id="level-selection" class="absolute inset-0 z-20 bg-zinc-950/95 flex flex-col items-center p-6 transition-all duration-500 overflow-y-auto backdrop-blur-xl">
             <h2 class="text-3xl font-black mb-8 tracking-widest bg-gradient-to-r from-cyan-300 to-blue-500 bg-clip-text text-transparent uppercase mt-4">Sektoren</h2>
-            <div id="level-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-5 w-full max-w-6xl pb-10"></div>
+            
+            <div id="level-tabs" class="flex overflow-x-auto gap-2 mb-6 pb-2 no-scrollbar border-b border-zinc-800">
+                <button class="level-tab active px-4 py-2 text-sm font-bold rounded-lg bg-zinc-800 text-white whitespace-nowrap" data-tab="0">1-40</button>
+                <button class="level-tab px-4 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 whitespace-nowrap" data-tab="1">41-80</button>
+                <button class="level-tab px-4 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 whitespace-nowrap" data-tab="2">81-120</button>
+                <button class="level-tab px-4 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 whitespace-nowrap" data-tab="3">121-160</button>
+                <button class="level-tab px-4 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 whitespace-nowrap" data-tab="4">161-200</button>
+            </div>
+            <div id="level-grid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 sm:gap-4 pb-20"></div>
+
         </div>
 
         <div id="game-controls" class="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-[95%] max-w-2xl hidden pointer-events-auto z-10">
