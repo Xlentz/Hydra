@@ -178,52 +178,69 @@ class HydraGame {
         }
     }
 
-    renderLevelList() {
-        const grid = document.getElementById('level-grid');
-        grid.innerHTML = '';
+    
+    renderChapters() {
+        const cGrid = document.getElementById('chapter-grid');
+        const lGrid = document.getElementById('level-grid');
+        const cHeader = document.getElementById('chapter-header');
         
-        this.currentPage = this.currentPage || 0;
-        const perPage = 40;
-        const totalPages = Math.ceil(HYDRA_LEVELS.length / perPage);
+        cGrid.innerHTML = '';
+        cGrid.classList.remove('hidden');
+        lGrid.classList.add('hidden');
+        cHeader.classList.add('hidden');
         
-        let startIdx = this.currentPage * perPage;
-        let endIdx = Math.min(startIdx + perPage, HYDRA_LEVELS.length);
-
-        const pageInd = document.getElementById('page-indicator');
-        if(pageInd) pageInd.textContent = `Sektor ${startIdx + 1} - ${endIdx}`;
+        const chapters = [
+            { id: 'tutorial', title: '1. Tutorial', desc: 'Lerne die Grundlagen', levels: LEVELS_TUTORIAL, color: 'text-emerald-400', border: 'border-emerald-500/50' },
+            { id: 'standard', title: '2. Standard', desc: 'Geraden und Kurven', levels: LEVELS_STANDARD, color: 'text-cyan-400', border: 'border-cyan-500/50' },
+            { id: 'cross', title: '3. Kreuzungen', desc: 'Wege überschneiden', levels: LEVELS_CROSS, color: 'text-yellow-400', border: 'border-yellow-500/50' },
+            { id: 'mixer', title: '4. Mixer', desc: 'Farben kombinieren', levels: LEVELS_MIXER, color: 'text-purple-400', border: 'border-purple-500/50' },
+            { id: 'splitter', title: '5. Splitter', desc: 'Farben aufteilen', levels: LEVELS_SPLITTER, color: 'text-orange-400', border: 'border-orange-500/50' },
+            { id: 'expert', title: '6. Experte', desc: 'Die ultimative Prüfung', levels: LEVELS_EXPERT, color: 'text-red-400', border: 'border-red-500/50' }
+        ];
         
-        const prevBtn = document.getElementById('btn-prev-page');
-        const nextBtn = document.getElementById('btn-next-page');
+        chapters.forEach(ch => {
+            const btn = document.createElement('button');
+            btn.className = `p-6 flex flex-col items-start justify-center rounded-2xl transition-all bg-zinc-900 border ${ch.border} hover:scale-105 hover:bg-zinc-800 shadow-[0_0_15px_rgba(0,0,0,0.5)]`;
+            btn.innerHTML = `<span class="text-2xl font-black ${ch.color} mb-2">${ch.title}</span><span class="text-zinc-400 text-sm">${ch.desc}</span><span class="text-xs text-zinc-500 mt-4">${ch.levels.length} Level</span>`;
+            btn.onclick = () => {
+                this.currentChapterLevels = ch.levels;
+                this.currentChapterTitle = ch.title;
+                this.renderLevelList();
+            };
+            cGrid.appendChild(btn);
+        });
         
-        if (prevBtn && nextBtn) {
-            const newPrev = prevBtn.cloneNode(true);
-            prevBtn.parentNode.replaceChild(newPrev, prevBtn);
-            const newNext = nextBtn.cloneNode(true);
-            nextBtn.parentNode.replaceChild(newNext, nextBtn);
-            
-            newPrev.disabled = this.currentPage === 0;
-            newNext.disabled = this.currentPage === totalPages - 1;
-            
-            newPrev.addEventListener('click', () => {
-                if(this.currentPage > 0) {
-                    this.currentPage--;
-                    this.renderLevelList();
-                }
-            });
-            
-            newNext.addEventListener('click', () => {
-                if(this.currentPage < totalPages - 1) {
-                    this.currentPage++;
-                    this.renderLevelList();
-                }
-            });
+        const btnBack = document.getElementById('btn-back-chapters');
+        if(btnBack) {
+            btnBack.onclick = () => {
+                this.renderChapters();
+            };
         }
+    }
 
-        for(let i = startIdx; i < endIdx; i++) {
-            const level = HYDRA_LEVELS[i];
+    renderLevelList() {
+        const cGrid = document.getElementById('chapter-grid');
+        const lGrid = document.getElementById('level-grid');
+        const cHeader = document.getElementById('chapter-header');
+        const cTitle = document.getElementById('chapter-title');
+        
+        cGrid.classList.add('hidden');
+        lGrid.classList.remove('hidden');
+        cHeader.classList.remove('hidden');
+        cTitle.textContent = this.currentChapterTitle || 'LEVELS';
+        
+        lGrid.innerHTML = '';
+        
+        if (!this.currentChapterLevels) this.currentChapterLevels = LEVELS_TUTORIAL;
+
+        for(let i = 0; i < this.currentChapterLevels.length; i++) {
+            const level = this.currentChapterLevels[i];
             const btn = document.createElement('button');
             
-            let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[level.id] || 0) : 0;
+            // Generate distinct internal key for stats so levels across chapters don't overlap if IDs are 1-50
+            const statKey = `${this.currentChapterTitle.split('.')[0]}_${level.id}`;
+            let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[statKey] || 0) : 0;
+            
             let starHtml = '';
             if (stars > 0) {
                 starHtml = `<div class="flex mt-1">`;
@@ -238,12 +255,11 @@ class HydraGame {
             btn.className = `h-20 flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
             btn.innerHTML = `<span class="text-2xl ${isCompleted ? 'text-cyan-300' : 'text-zinc-500'}">${level.id}</span>${starHtml}`;
             btn.onclick = () => this.startLevel(i);
-            grid.appendChild(btn);
+            lGrid.appendChild(btn);
         }
     }
-
-    startLevel(index) {
-        this.currentLevel = JSON.parse(JSON.stringify(HYDRA_LEVELS[index]));
+startLevel(index) {
+        this.currentLevel = JSON.parse(JSON.stringify(this.currentChapterLevels[index]));
         this.initialInventory = JSON.parse(JSON.stringify(this.currentLevel.inventory));
         
         this.isFlowing = false;
@@ -380,7 +396,7 @@ class HydraGame {
         
         document.getElementById('btn-next').onclick = () => {
             document.getElementById('win-overlay').classList.add('hidden');
-            if (this.currentLevel.id < HYDRA_LEVELS.length) this.startLevel(this.currentLevel.id);
+            if (this.currentLevel.id < this.currentChapterLevels.length) this.startLevel(this.currentLevel.id);
             else location.reload();
         }
     }
@@ -1311,7 +1327,7 @@ window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('game-controls').classList.add('hidden');
             document.getElementById('level-selection').classList.remove('hidden');
             if(window.gameInstance && window.gameInstance.renderLevelList) {
-                window.gameInstance.renderLevelList();
+                window.gameInstance.renderLevelList(); // Goes back to the current chapter's level list
             }
         });
     }

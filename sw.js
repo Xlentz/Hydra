@@ -1,8 +1,13 @@
-const CACHE_NAME = 'hydra-logic-v9';
+const CACHE_NAME = 'hydra-logic-v10';
 const ASSETS = [
   './',
   './index.html',
-  './levels.js',
+  './levels_tutorial.js',
+  './levels_standard.js',
+  './levels_cross.js',
+  './levels_mixer.js',
+  './levels_splitter.js',
+  './levels_expert.js',
   './app.js',
   'https://cdn.tailwindcss.com'
 ];
