@@ -1,3 +1,4 @@
+
 class AudioEngine {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -28,7 +29,7 @@ class AudioEngine {
         osc.connect(gain); gain.connect(this.ctx.destination);
         osc.start(); osc.stop(this.ctx.currentTime + 1.0);
     }
-
+    
     playWin() {
         if (!this.enabled || this.ctx.state === 'suspended') return;
         const notes = [440, 554, 659, 880];
@@ -45,702 +46,1269 @@ class AudioEngine {
 
 class HydraGame {
     constructor() {
-        this.audio = new AudioEngine();
-        
-        // Neue kapitelbasierte Gliederung registrieren
-        this.chapters = {
-            tutorial: { id: 'tutorial', title: '1. Tutorial', levels: typeof LEVELS_TUTORIAL !== 'undefined' ? LEVELS_TUTORIAL : [], icon: '📖', desc: 'Grundlagen & Element-Mechaniken' },
-            standard: { id: 'standard', title: '2. Standard', levels: typeof LEVELS_STANDARD !== 'undefined' ? LEVELS_STANDARD : [], icon: '🔧', desc: 'Geraden & Bögen stetig schwerer' },
-            cross: { id: 'cross', title: '3. Kreuzungen', levels: typeof LEVELS_CROSS !== 'undefined' ? LEVELS_CROSS : [], icon: '➕', desc: 'Überkreuzungen clever einbauen' },
-            mixer: { id: 'mixer', title: '4. Mixer', levels: typeof LEVELS_MIXER !== 'undefined' ? LEVELS_MIXER : [], icon: '🧪', desc: 'Farben mischen für System-Ziele' },
-            splitter: { id: 'splitter', title: '5. Splitter', levels: typeof LEVELS_SPLITTER !== 'undefined' ? LEVELS_SPLITTER : [], icon: '⚗️', desc: 'Mischströme präzise separieren' },
-            expert: { id: 'expert', title: '6. Experte', levels: typeof LEVELS_EXPERT !== 'undefined' ? LEVELS_EXPERT : [], icon: '🏆', desc: 'Maximale Härte. Alle Kombinationen' }
-        };
-
-        this.currentChapter = null;
-        this.currentLevelIndex = 0;
-        this.levelData = null;
-        
-        // Emojis für den Profile Avatar-Picker
-        this.availAvatars = ['🕵️', '🤖', '🚀', '🧠', '👾', '🛸', '💻', '🔋', '⚙️', '🛡️', '🧪', '⚡', '👑', '🦾', '💥'];
-        this.selectedAvatar = localStorage.getItem('hydra_avatar') || '🕵️';
-        
-        // Fortschritt laden
-        this.totalXP = parseInt(localStorage.getItem('hydra_xp')) || 0;
-        this.solvedLevels = JSON.parse(localStorage.getItem('hydra_solved')) || {};
-        
-        // Gameplay Variablen
-        this.grid = [];
-        this.inventory = {};
-        this.selectedTool = null;
-        this.clickCount = 0;
-        this.isFlowing = false;
-        this.flowAnimationProgress = 0;
-        this.animationTimer = null;
-
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.colorMap = {
-            'blue': '#06b6d4', 'red': '#ef4444', 'yellow': '#eab308',
-            'green': '#22c55e', 'purple': '#a855f7', 'orange': '#f97316',
-            'white': '#ffffff'
-        };
-
-        this.initEvents();
-        this.updateTopBar();
-        this.renderLevelList();
-        this.resizeCanvas();
-        window.addEventListener('resize', () => this.resizeCanvas());
-    }
-
-    initEvents() {
-        this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-        document.getElementById('reset-btn').addEventListener('click', () => this.resetLevel());
-        document.getElementById('flow-btn').addEventListener('click', () => this.toggleFlow());
-        document.getElementById('profile-btn').addEventListener('click', () => this.showProfile());
-        document.getElementById('btn-close-profile').addEventListener('click', () => {
-            document.getElementById('modal-profile').classList.add('hidden');
-        });
-        document.getElementById('btn-save-profile').addEventListener('click', () => this.saveProfile());
-        document.getElementById('btn-reset-progress').addEventListener('click', () => this.resetAllData());
-        document.getElementById('btn-next-level').addEventListener('click', () => {
-            document.getElementById('modal-win').classList.add('hidden');
-            this.nextLevel();
-        });
-    }
-
-    updateTopBar() {
-        const agentName = localStorage.getItem('hydra_agent_name') || 'Agent-X';
-        this.selectedAvatar = localStorage.getItem('hydra_avatar') || '🕵️';
+        this.audio = new AudioEngine();
         
-        document.getElementById('top-avatar').innerText = this.selectedAvatar;
-        document.getElementById('top-agent-name').innerText = agentName;
-        document.getElementById('top-xp').innerText = `${this.totalXP} XP`;
-        let starCount = Object.values(this.solvedLevels).reduce((a, b) => a + b, 0);
-        document.getElementById('top-stars').innerText = starCount;
+        this.currentLevel = null;
+        this.grid = []; 
+        this.initialInventory = null; 
+        this.activeTool = 'PIPE_STRAIGHT';
+        this.cellSize = 75;
+        this.offsetX = 0; this.offsetY = 0;
+        
+        this.isFlowing = false;
+        this.clicks = 0;
+        this.flowAnimationProgress = 0; 
+        this.time = 0;
+        
+        // High-end glowing colors
+        this.colorMap = { 
+            'blue': '#0ea5e9', 
+            'yellow': '#eab308', 
+            'red': '#ef4444', 
+            'green': '#10b981', 
+            'purple': '#a855f7', 
+            'orange': '#f97316' 
+        };
+        this.shapeMap = { 'blue': 'circle', 'yellow': 'triangle', 'red': 'square', 'green': 'diamond', 'purple': 'cross', 'orange': 'star' };
+
+        this.playerStats = JSON.parse(localStorage.getItem('hydra_stats')) || {
+            name: "Gast-Operator", avatar: "👽", xp: 0, stars: 0, levelStars: {}, audio: true, colorblind: false 
+        };
+        this.audio.enabled = this.playerStats.audio;
+
+        this.init();
+        window.addEventListener('resize', () => this.resize());
+        
+        document.body.addEventListener('click', () => {
+            if(this.audio.ctx.state === 'suspended') this.audio.ctx.resume();
+        }, {once: true});
+    }
+
+    init() {
+        this.resize();
+        this.renderLevelList();
+        this.setupEventListeners();
+        requestAnimationFrame((t) => this.gameLoop(t));
+        this.updateUI(); 
+    }
+
+    resize() {
+        this.canvas.width = this.canvas.parentElement.clientWidth;
+        this.canvas.height = this.canvas.parentElement.clientHeight;
+        if(this.currentLevel) this.centerGrid();
+    }
+
+    centerGrid() {
+        if (!this.currentLevel) return;
+        const cols = this.currentLevel.gridSize.cols;
+        const rows = this.currentLevel.gridSize.rows;
+        
+        let usableHeight = this.canvas.height - 180;
+        if(usableHeight < 300) usableHeight = 300;
+        
+        // Guarantee that the grid fits both horizontally and vertically, with 40px padding on width
+        this.cellSize = Math.floor(Math.min((this.canvas.width - 40) / cols, usableHeight / rows));
+        if (this.cellSize > 85) this.cellSize = 85;
+        
+        const gridW = cols * this.cellSize;
+        const gridH = rows * this.cellSize;
+        
+        this.offsetX = Math.floor((this.canvas.width - gridW) / 2);
+        this.offsetY = Math.floor((usableHeight - gridH) / 2 + 50); 
+    }
+
+    updateUI() {
+        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        
+        setEl('player-name', this.playerStats.name);
+        setEl('header-avatar', this.playerStats.avatar);
+        setEl('player-xp-header', this.playerStats.xp + ' XP');
+        setEl('player-xp', this.playerStats.xp);
+        setEl('player-stars', this.playerStats.stars);
+        
+        if (this.currentLevel && this.initialInventory) {
+            setEl('inv-straight', this.currentLevel.inventory.pipes_straight || 0);
+            setEl('inv-angle', this.currentLevel.inventory.pipes_angle || 0);
+            setEl('inv-cross', this.currentLevel.inventory.pipes_cross || 0);
+            setEl('inv-and', this.currentLevel.inventory.andGates || 0);
+            setEl('inv-mix', this.currentLevel.inventory.mixers || 0);
+            setEl('inv-split', this.currentLevel.inventory.splitters || 0);
+            setEl('inv-portal', this.currentLevel.inventory.portals || 0);
+            setEl('inv-valve', this.currentLevel.inventory.valves || 0);
+            
+            const toolKeys = {
+                'straight': 'pipes_straight',
+                'angle': 'pipes_angle',
+                'cross': 'pipes_cross',
+                'and': 'andGates',
+                'mix': 'mixers',
+                'split': 'splitters',
+                'portal': 'portals',
+                'valve': 'valves'
+            };
+            
+            for (let t in toolKeys) {
+                const btn = document.getElementById(`btn-t-${t}`);
+                if (btn) {
+                    btn.style.display = (this.initialInventory[toolKeys[t]] > 0) ? 'flex' : 'none';
+                }
+            }
+            
+            setEl('header-level-info', `Sektor ${this.currentLevel.id}`);
+            setEl('click-counter', this.clicks);
+            setEl('par-clicks', this.currentLevel.parClicks || 10);
+        }
+        
+        const audioBtn = document.getElementById('toggle-audio');
+        const audioKnob = document.getElementById('audio-knob');
+        if(audioBtn) {
+            audioBtn.classList.toggle('bg-cyan-500', this.playerStats.audio);
+            audioBtn.classList.toggle('bg-zinc-800', !this.playerStats.audio);
+            audioKnob.style.transform = this.playerStats.audio ? 'translateX(28px)' : 'translateX(0)';
+        }
+        
+        const cbBtn = document.getElementById('toggle-colorblind');
+        const cbKnob = document.getElementById('colorblind-knob');
+        if(cbBtn) {
+            cbBtn.classList.toggle('bg-cyan-500', this.playerStats.colorblind);
+            cbBtn.classList.toggle('bg-zinc-800', !this.playerStats.colorblind);
+            cbKnob.style.transform = this.playerStats.colorblind ? 'translateX(28px)' : 'translateX(0)';
+        }
+    }
+
+    
+    renderChapters() {
+        const cGrid = document.getElementById('chapter-grid');
+        const lGrid = document.getElementById('level-grid');
+        const cHeader = document.getElementById('chapter-header');
+        
+        cGrid.innerHTML = '';
+        cGrid.classList.remove('hidden');
+        lGrid.classList.add('hidden');
+        cHeader.classList.add('hidden');
+        
+        const chapters = [
+            { id: 'tutorial', title: '1. Tutorial', desc: 'Lerne die Grundlagen', levels: LEVELS_TUTORIAL, color: 'text-emerald-400', border: 'border-emerald-500/50' },
+            { id: 'standard', title: '2. Standard', desc: 'Geraden und Kurven', levels: LEVELS_STANDARD, color: 'text-cyan-400', border: 'border-cyan-500/50' },
+            { id: 'cross', title: '3. Kreuzungen', desc: 'Wege überschneiden', levels: LEVELS_CROSS, color: 'text-yellow-400', border: 'border-yellow-500/50' },
+            { id: 'mixer', title: '4. Mixer', desc: 'Farben kombinieren', levels: LEVELS_MIXER, color: 'text-purple-400', border: 'border-purple-500/50' },
+            { id: 'splitter', title: '5. Splitter', desc: 'Farben aufteilen', levels: LEVELS_SPLITTER, color: 'text-orange-400', border: 'border-orange-500/50' },
+            { id: 'expert', title: '6. Experte', desc: 'Die ultimative Prüfung', levels: LEVELS_EXPERT, color: 'text-red-400', border: 'border-red-500/50' }
+        ];
+        
+        chapters.forEach(ch => {
+            const btn = document.createElement('button');
+            btn.className = `p-6 flex flex-col items-start justify-center rounded-2xl transition-all bg-zinc-900 border ${ch.border} hover:scale-105 hover:bg-zinc-800 shadow-[0_0_15px_rgba(0,0,0,0.5)]`;
+            btn.innerHTML = `<span class="text-2xl font-black ${ch.color} mb-2">${ch.title}</span><span class="text-zinc-400 text-sm">${ch.desc}</span><span class="text-xs text-zinc-500 mt-4">${ch.levels.length} Level</span>`;
+            btn.onclick = () => {
+                this.currentChapterLevels = ch.levels;
+                this.currentChapterTitle = ch.title;
+                this.renderLevelList();
+            };
+            cGrid.appendChild(btn);
+        });
+        
+        const btnBack = document.getElementById('btn-back-chapters');
+        if(btnBack) {
+            btnBack.onclick = () => {
+                this.renderChapters();
+            };
+        }
     }
 
     renderLevelList() {
-        const gridContainer = document.getElementById('level-grid');
-        const menuTitle = document.getElementById('menu-title');
-        gridContainer.innerHTML = '';
-
-        if (this.currentChapter === null) {
-            menuTitle.innerText = "Wähle ein Kapitel";
-            gridContainer.className = "grid grid-cols-1 gap-3 p-1 max-h-[68vh] overflow-y-auto w-full";
-
-            Object.keys(this.chapters).forEach(key => {
-                const chap = this.chapters[key];
-                const card = document.createElement('button');
-                card.className = "glass-effect p-3.5 rounded-xl text-left hover:border-cyan-500/50 hover:bg-zinc-900/40 transition-all flex items-center gap-4 group w-full";
-                
-                let completedInChapter = Object.keys(this.solvedLevels).filter(k => k.startsWith(key)).length;
-
-                card.innerHTML = `
-                    <div class="text-2xl bg-zinc-950 p-2.5 rounded-xl border border-zinc-900 group-hover:scale-105 transition-transform">${chap.icon}</div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="font-black text-xs text-slate-200 tracking-wide uppercase truncate">${chap.title}</h3>
-                        <p class="text-[10px] text-zinc-400 truncate mt-0.5">${chap.desc}</p>
-                        <span class="text-[9px] uppercase font-bold text-cyan-400 mt-1 block tracking-wider">${completedInChapter} / ${chap.levels.length} Erledigt</span>
-                    </div>
-                    <div class="text-zinc-600 group-hover:text-cyan-400 transition-colors pr-1">➔</div>
-                `;
-                
-                card.addEventListener('click', () => {
-                    this.audio.playClick();
-                    this.currentChapter = key;
-                    this.renderLevelList();
-                });
-                gridContainer.appendChild(card);
-            });
-        } else {
-            const chap = this.chapters[this.currentChapter];
-            menuTitle.innerText = chap.title;
-            gridContainer.className = "grid grid-cols-4 gap-2.5 p-1 max-h-[68vh] overflow-y-auto w-full";
-
-            const backBtn = document.createElement('button');
-            backBtn.className = "col-span-full py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-cyan-400 transition-colors";
-            backBtn.innerHTML = `⬅ Zurück zur Kapitelübersicht`;
-            backBtn.addEventListener('click', () => {
-                this.audio.playClick();
-                this.currentChapter = null;
-                this.renderLevelList();
-            });
-            gridContainer.appendChild(backBtn);
-
-            chap.levels.forEach((level, index) => {
-                const btn = document.createElement('button');
-                let key = `${this.currentChapter}_${index}`;
-                let isSolved = this.solvedLevels[key] || 0;
-
-                let borderStyle = "border-zinc-900 text-zinc-400 hover:border-zinc-700";
-                if (isSolved > 0) borderStyle = "border-emerald-500/40 bg-emerald-950/10 text-emerald-400";
-                else if (index === 0 || this.solvedLevels[`${this.currentChapter}_${index-1}`]) {
-                    borderStyle = "border-zinc-800 text-slate-200 hover:border-cyan-500";
-                }
-
-                btn.className = `glass-effect aspect-square rounded-xl border flex flex-col items-center justify-center transition-all ${borderStyle}`;
-                btn.innerHTML = `
-                    <span class="text-sm font-black">${index + 1}</span>
-                    <span class="text-[8px] font-bold tracking-tight opacity-60">${'⭐'.repeat(isSolved) || level.difficulty}</span>
-                `;
-                
-                btn.addEventListener('click', () => {
-                    this.audio.playClick();
-                    this.startLevel(this.currentChapter, index);
-                });
-                gridContainer.appendChild(btn);
-            });
-        }
-    }
-
-    resizeCanvas() {
-        const size = this.canvas.parentElement.clientWidth;
-        this.canvas.width = size;
-        this.canvas.height = size;
-        this.draw();
-    }
-
-    startLevel(chapterId, index) {
-        this.currentChapter = chapterId;
-        this.currentLevelIndex = index;
-        this.levelData = this.chapters[chapterId].levels[index];
+        const cGrid = document.getElementById('chapter-grid');
+        const lGrid = document.getElementById('level-grid');
+        const cHeader = document.getElementById('chapter-header');
+        const cTitle = document.getElementById('chapter-title');
         
-        if (!this.levelData) return;
+        cGrid.classList.add('hidden');
+        lGrid.classList.remove('hidden');
+        cHeader.classList.remove('hidden');
+        cTitle.textContent = this.currentChapterTitle || 'LEVELS';
+        
+        lGrid.innerHTML = '';
+        if (!this.currentChapterLevels) this.currentChapterLevels = LEVELS_TUTORIAL;
 
-        this.clickCount = 0;
-        this.isFlowing = false;
-        this.flowAnimationProgress = 0;
-        if (this.animationTimer) clearInterval(this.animationTimer);
-
-        this.inventory = { ...this.levelData.inventory };
-        this.selectedTool = Object.keys(this.inventory).find(k => this.inventory[k] > 0) || null;
-
-        this.grid = [];
-        const cols = this.levelData.gridSize.cols;
-        const rows = this.levelData.gridSize.rows;
-
-        for (let x = 0; x < cols; x++) {
-            this.grid[x] = [];
-            for (let y = 0; y < rows; y++) {
-                this.grid[x][y] = { type: 'empty', pipeType: null, dir: 0, flows: {} };
+        for(let i = 0; i < this.currentChapterLevels.length; i++) {
+            const level = this.currentChapterLevels[i];
+            const btn = document.createElement('button');
+            const statKey = `${(this.currentChapterTitle || '1').split('.')[0]}_${level.id}`;
+            let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[statKey] || 0) : 0;
+            
+            let starHtml = '';
+            if (stars > 0) {
+                starHtml = `<div class="flex mt-1">`;
+                for(let j=0; j<3; j++) {
+                    starHtml += `<svg class="w-3.5 h-3.5 ${j<stars ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'text-zinc-700'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
+                }
+                starHtml += `</div>`;
             }
+            
+            let isCompleted = stars > 0;
+            btn.className = `h-20 flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
+            btn.innerHTML = `<span class="text-2xl ${isCompleted ? 'text-cyan-300' : 'text-zinc-500'}">${level.id}</span>${starHtml}`;
+            btn.onclick = () => this.startLevel(i);
+            lGrid.appendChild(btn);
         }
+    }
 
-        this.levelData.walls.forEach(w => {
-            if (this.grid[w.x] && this.grid[w.x][w.y]) this.grid[w.x][w.y].type = 'wall';
-        });
-
-        this.levelData.sources.forEach(s => {
-            if (this.grid[s.x] && this.grid[s.x][s.y]) {
-                this.grid[s.x][s.y].type = 'source';
-                this.grid[s.x][s.y].color = s.color;
-            }
-        });
-
-        this.levelData.targets.forEach(t => {
-            if (this.grid[t.x] && this.grid[t.x][t.y]) {
-                this.grid[t.x][t.y].type = 'target';
-                this.grid[t.x][t.y].requiredColor = t.requiredColor;
-            }
-        });
-
+    startLevel(index) {
+        this.currentLevel = JSON.parse(JSON.stringify(this.currentChapterLevels[index]));
+        this.initialInventory = JSON.parse(JSON.stringify(this.currentLevel.inventory));
+        
+        this.isFlowing = false;
+        this.clicks = 0;
+        this.flowAnimationProgress = 0;
+        
+        const { cols, rows } = this.currentLevel.gridSize;
+        this.centerGrid();
+        this.grid = Array(rows).fill().map(() => Array(cols).fill(null));
+        
+        if (this.currentLevel.walls) {
+            this.currentLevel.walls.forEach(w => {
+                if(this.grid[w.y] && this.grid[w.y][w.x] === null) this.grid[w.y][w.x] = { type: 'WALL' };
+            });
+        }
+        
         document.getElementById('level-selection').classList.add('hidden');
         document.getElementById('game-controls').classList.remove('hidden');
-        document.getElementById('game-level-title').innerText = `Sektor ${index + 1}`;
-        document.getElementById('game-level-hint').innerText = this.levelData.hint || 'Verbinde die Energieströme.';
         
-        this.updateInventoryUI();
-        this.updateClicksUI();
-        this.resizeCanvas();
+        // Remove active class from delete tool, set to straight pipe by default
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-t-straight').classList.add('active');
+        this.activeTool = 'PIPE_STRAIGHT';
+        
+        this.updateUI();
+        this.calculateFlow(true); 
     }
 
-    updateInventoryUI() {
-        const container = document.getElementById('inventory-bar');
-        container.innerHTML = '';
+    setupEventListeners() {
+        const modal = document.getElementById('profile-modal');
+        let selectedAvatarTemp = this.playerStats.avatar;
 
-        const iconMap = {
-            pipes_straight: '║', pipes_angle: '╗', pipes_cross: '╬',
-            mixers: '🧪', splitters: '⚗️', valves: '🛑', portals: '🌀', andGates: ''
-        };
-        const nameMap = {
-            pipes_straight: 'Gerade', pipes_angle: 'Bogen', pipes_cross: 'Kreuz',
-            mixers: 'Mixer', splitters: 'Splitter', valves: 'Ventil', portals: 'Portal', andGates: 'AND'
-        };
-
-        Object.keys(this.inventory).forEach(key => {
-            if (this.inventory[key] === undefined || this.inventory[key] === 0) return;
-            const btn = document.createElement('button');
-            const isActive = this.selectedTool === key;
+        document.getElementById('btn-open-profile').onclick = () => {
+            document.getElementById('input-player-name').value = this.playerStats.name;
+            document.getElementById('modal-xp').textContent = this.playerStats.xp + ' XP';
+            document.getElementById('modal-stars').textContent = this.playerStats.stars;
             
-            btn.className = `p-1 flex flex-col items-center justify-center rounded-lg border transition-all ${isActive ? 'bg-cyan-950/50 border-cyan-500 text-cyan-400' : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`;
-            btn.innerHTML = `
-                <span class="text-base font-bold">${iconMap[key] || '?'}</span>
-                <span class="text-[8px] font-black uppercase tracking-tight mt-0.5 truncate max-w-full">${nameMap[key] || key}</span>
-                <span class="text-[9px] font-black opacity-80 mt-0.5">${this.inventory[key]}</span>
-            `;
-
-            btn.addEventListener('click', () => {
-                this.audio.playClick();
-                this.selectedTool = key;
-                this.updateInventoryUI();
+            document.querySelectorAll('.avatar-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.avatar === this.playerStats.avatar);
+                btn.onclick = (e) => {
+                    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+                    e.currentTarget.classList.add('selected');
+                    selectedAvatarTemp = e.currentTarget.dataset.avatar;
+                };
             });
-            container.appendChild(btn);
+            this.updateUI();
+            modal.classList.remove('hidden');
+        };
+        
+        document.getElementById('btn-close-profile').onclick = () => modal.classList.add('hidden');
+        
+        document.getElementById('btn-save-profile').onclick = () => {
+            const nameInput = document.getElementById('input-player-name').value.trim();
+            if(nameInput) this.playerStats.name = nameInput;
+            this.playerStats.avatar = selectedAvatarTemp;
+            localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
+            this.updateUI();
+            modal.classList.add('hidden');
+        };
+        
+        document.getElementById('toggle-audio').onclick = () => {
+            this.playerStats.audio = !this.playerStats.audio;
+            this.audio.enabled = this.playerStats.audio;
+            this.updateUI();
+        };
+        
+        document.getElementById('toggle-colorblind').onclick = () => {
+            this.playerStats.colorblind = !this.playerStats.colorblind;
+            this.updateUI();
+        };
+
+        document.querySelectorAll('.tool-btn, #btn-t-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tool-btn, #btn-t-delete').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                
+                // If it's a regular tool button, handle it normally
+                if(target.classList.contains('tool-btn')) {
+                    target.classList.add('active');
+                } else {
+                    // For the delete button (which doesn't have the tool-btn class for styling reasons)
+                    target.classList.add('active');
+                    target.style.transform = 'scale(1.05)';
+                    target.style.borderColor = '#fda4af';
+                    target.style.backgroundColor = 'rgba(159, 18, 57, 0.8)';
+                    
+                    setTimeout(() => {
+                        target.style.transform = '';
+                        target.style.borderColor = '';
+                        target.style.backgroundColor = '';
+                    }, 200);
+                }
+                
+                this.activeTool = target.dataset.tool;
+            });
         });
-    }
 
-    updateClicksUI() {
-        document.getElementById('game-clicks-display').innerText = `${this.clickCount} / ${this.levelData.parClicks}`;
-    }
-
-    handleCanvasClick(e) {
-        if (this.isFlowing) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const clientX = e.clientX - rect.left;
-        const clientY = e.clientY - rect.top;
-
-        const cols = this.levelData.gridSize.cols;
-        const rows = this.levelData.gridSize.rows;
-        const cellSize = this.canvas.width / cols;
-
-        const x = Math.floor(clientX / cellSize);
-        const y = Math.floor(clientY / cellSize);
-
-        if (x < 0 || x >= cols || y < 0 || y >= rows) return;
-        const cell = this.grid[x][y];
-
-        if (cell.type === 'empty' && this.selectedTool && this.inventory[this.selectedTool] > 0) {
-            this.audio.playClick();
-            cell.type = 'pipe';
-            cell.pipeType = this.selectedTool;
-            cell.dir = 0;
-            this.inventory[this.selectedTool]--;
-            this.clickCount++;
-        } else if (cell.type === 'pipe') {
-            this.audio.playClick();
-            if (cell.pipeType === this.selectedTool) {
-                cell.dir = (cell.dir + 1) % 4;
-                this.clickCount++;
-            } else {
-                this.inventory[cell.pipeType]++;
-                cell.type = 'empty';
-                cell.pipeType = null;
-                cell.dir = 0;
+        this.canvas.addEventListener('pointerdown', (e) => {
+            if (!this.currentLevel || this.isFlowing) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const col = Math.floor((e.clientX - rect.left - this.offsetX) / this.cellSize);
+            const row = Math.floor((e.clientY - rect.top - this.offsetY) / this.cellSize);
+            if (col >= 0 && col < this.currentLevel.gridSize.cols && row >= 0 && row < this.currentLevel.gridSize.rows) {
+                this.handleCellClick(col, row);
             }
-        }
+        });
 
-        this.updateInventoryUI();
-        this.updateClicksUI();
-        this.draw();
-    }
-
-    toggleFlow() {
-        if (this.isFlowing) {
-            this.isFlowing = false;
-            this.flowAnimationProgress = 0;
-            clearInterval(this.animationTimer);
-            document.getElementById('flow-btn').innerText = "Fluss Starten";
-            this.clearFlows();
-            this.draw();
-        } else {
+        document.getElementById('btn-play').onclick = () => {
             this.isFlowing = true;
             this.audio.playFlowStart();
-            document.getElementById('flow-btn').innerText = "Stoppen";
-            this.simulateFlows();
+            this.calculateFlow(false);
             
-            this.animationTimer = setInterval(() => {
-                this.flowAnimationProgress += 5;
-                if (this.flowAnimationProgress >= 100) {
-                    this.flowAnimationProgress = 100;
-                    clearInterval(this.animationTimer);
+            this.flowAnimationProgress = 0;
+            const animInterval = setInterval(() => {
+                this.flowAnimationProgress += 2.5; // Smooth out animation
+                if(this.flowAnimationProgress >= 100) {
+                    clearInterval(animInterval);
                     this.checkWinCondition();
                 }
-                this.draw();
-            }, 25);
-        }
-    }
-
-    clearFlows() {
-        for (let x = 0; x < this.levelData.gridSize.cols; x++) {
-            for (let y = 0; y < this.levelData.gridSize.rows; y++) {
-                this.grid[x][y].flows = {};
+            }, 30);
+        };
+        
+        document.getElementById('btn-reset').onclick = () => {
+            this.startLevel(this.currentLevel.id - 1);
+        };
+        
+        document.getElementById('btn-solution').onclick = () => {
+            if (this.currentLevel && this.currentLevel.hint) {
+                alert("Tipp: " + this.currentLevel.hint);
+            } else {
+                alert("Für diesen Sektor sind leider keine Tipps verfügbar.");
             }
+        };
+        
+        document.getElementById('btn-next').onclick = () => {
+            document.getElementById('win-overlay').classList.add('hidden');
+            if (this.currentLevel.id < this.currentChapterLevels.length) this.startLevel(this.currentLevel.id);
+            else location.reload();
         }
     }
 
-    simulateFlows() {
-        this.clearFlows();
-        let queue = [];
-        const dx = [0, 1, 0, -1]; // 0: Oben, 1: Rechts, 2: Unten, 3: Links
-        const dy = [-1, 0, 1, 0];
+    handleCellClick(x, y) {
+        if (this.isSourceOrTarget(x, y)) return;
+        const cell = this.grid[y][x];
+        const inv = this.currentLevel.inventory;
 
-        let portalsOnBoard = [];
-        for(let x = 0; x < this.levelData.gridSize.cols; x++) {
-            for(let y = 0; y < this.levelData.gridSize.rows; y++) {
-                if(this.grid[x] && this.grid[x][y] && this.grid[x][y].type === 'pipe' && this.grid[x][y].pipeType === 'portals') {
-                    portalsOnBoard.push({x, y});
+        if (this.activeTool === 'DELETE') {
+            if (cell && cell.type !== 'WALL') {
+                if(cell.type === 'PIPE_STRAIGHT') inv.pipes_straight++;
+                if(cell.type === 'PIPE_ANGLE') inv.pipes_angle++;
+                if(cell.type === 'PIPE_CROSS') inv.pipes_cross++;
+                if(cell.type === 'AND_GATE') inv.andGates++;
+                if(cell.type === 'MIXER') inv.mixers++;
+                if(cell.type === 'SPLITTER') inv.splitters++;
+                if(cell.type === 'PORTAL') inv.portals++;
+                if(cell.type === 'VALVE') inv.valves++;
+                this.grid[y][x] = null;
+                this.audio.playClick();
+                this.clicks--;
+            }
+        } else {
+            if (cell) {
+                if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
+                    cell.rotation = (cell.rotation + 1) % 4;
+                    this.audio.playClick();
                 }
+            } else {
+                let p = false;
+                let rot = this.getBestRotation(x, y, this.activeTool);
+                
+                if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) { this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: rot }; inv.pipes_straight--; p = true; }
+                else if (this.activeTool === 'PIPE_ANGLE' && inv.pipes_angle > 0) { this.grid[y][x] = { type: 'PIPE_ANGLE', rotation: rot }; inv.pipes_angle--; p = true; }
+                else if (this.activeTool === 'PIPE_CROSS' && inv.pipes_cross > 0) { this.grid[y][x] = { type: 'PIPE_CROSS', rotation: 0 }; inv.pipes_cross--; p = true; }
+                else if (this.activeTool === 'AND_GATE' && inv.andGates > 0) { this.grid[y][x] = { type: 'AND_GATE', rotation: 0 }; inv.andGates--; p = true; }
+                else if (this.activeTool === 'MIXER' && inv.mixers > 0) { this.grid[y][x] = { type: 'MIXER', rotation: 0 }; inv.mixers--; p = true; }
+                else if (this.activeTool === 'SPLITTER' && inv.splitters > 0) { this.grid[y][x] = { type: 'SPLITTER', rotation: 0 }; inv.splitters--; p = true; }
+                else if (this.activeTool === 'PORTAL' && inv.portals > 0) { this.grid[y][x] = { type: 'PORTAL', rotation: 0 }; inv.portals--; p = true; }
+                else if (this.activeTool === 'VALVE' && inv.valves > 0) { this.grid[y][x] = { type: 'VALVE', rotation: rot }; inv.valves--; p = true; }
+                
+                if(p) { this.audio.playClick(); this.clicks++; }
             }
         }
+        
+        if (this.clicks < 0) this.clicks = 0;
+        this.updateUI();
+        this.calculateFlow(true); 
+    }
+    
+    isSourceOrTarget(x, y) {
+        let isST = false;
+        this.currentLevel.sources.forEach(s => { if(s.x === x && s.y === y) isST = true; });
+        this.currentLevel.targets.forEach(t => { if(t.x === x && t.y === y) isST = true; });
+        return isST;
+    }
 
-        this.levelData.sources.forEach(s => {
-            for (let d = 0; d < 4; d++) {
-                queue.push({ x: s.x + dx[d], y: s.y + dy[d], incomingDir: (d + 2) % 4, color: s.color });
+    
+        getBestRotation(x, y, type) {
+        let n = [false, false, false, false]; 
+        let w = [false, false, false, false]; 
+        let targets_dir = [false, false, false, false]; 
+        
+        const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
+        
+        DIRS.forEach(move => {
+            let nx = x + move.dx; let ny = y + move.dy;
+            if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
+                let isSource = this.currentLevel.sources.find(s => s.x === nx && s.y === ny);
+                let isTarget = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
+                if (isSource) { n[move.d] = true; w[move.d] = true; } 
+                else if (isTarget) { n[move.d] = true; targets_dir[move.d] = true; } 
+                else {
+                    let nCell = this.grid[ny][nx];
+                    if (nCell && nCell.type !== 'WALL') {
+                        let ports = this.getPorts(nCell);
+                        let oppDir = (move.d + 2) % 4;
+                        if (ports.includes(oppDir)) {
+                            n[move.d] = true;
+                            if (nCell.flows && nCell.flows[oppDir]) w[move.d] = true;
+                        }
+                    }
+                }
             }
         });
 
-        let iterations = 0;
-        while (queue.length > 0 && iterations < 2500) {
-            iterations++;
-            let current = queue.shift();
-            let x = current.x;
-            let y = current.y;
+        let tx = 0, ty = 0;
+        if(this.currentLevel.targets.length > 0) {
+            this.currentLevel.targets.forEach(t => { tx += t.x; ty += t.y; });
+            tx /= this.currentLevel.targets.length; ty /= this.currentLevel.targets.length;
+            let dx = tx - x; let dy = ty - y;
+            if (Math.abs(dy) >= Math.abs(dx)) {
+                if (dy < 0) targets_dir[0] = true; 
+                if (dy > 0) targets_dir[2] = true; 
+            }
+            if (Math.abs(dx) >= Math.abs(dy)) {
+                if (dx > 0) targets_dir[1] = true; 
+                if (dx < 0) targets_dir[3] = true; 
+            }
+        }
+
+        if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
+            if (w[1] || w[3]) return 1; 
+            if (w[0] || w[2]) return 0; 
+            if (n[1] || n[3]) return 1;
+            if (n[0] || n[2]) return 0;
+            if (targets_dir[1] || targets_dir[3]) return 1;
+            return 0; 
+        }
+        
+        if (type === 'PIPE_ANGLE') {
+            let scores = [0,0,0,0]; 
+            let evaluateRotation = (p1, p2) => {
+                let score = 0;
+                if (w[p1] || w[p2]) score += 50; 
+                if (n.some(val=>val) && !n[p1] && !n[p2]) score -= 20;
+                if (n[p1]) score += 10;
+                if (n[p2]) score += 10;
+                if (targets_dir[p1]) score += 5;
+                if (targets_dir[p2]) score += 5;
+                return score;
+            };
+
+            scores[0] = evaluateRotation(0, 1);
+            scores[1] = evaluateRotation(1, 2);
+            scores[2] = evaluateRotation(2, 3);
+            scores[3] = evaluateRotation(3, 0);
             
-            if (x < 0 || x >= this.levelData.gridSize.cols || y < 0 || y >= this.levelData.gridSize.rows) continue;
-            let cell = this.grid[x][y];
-            if (!cell) continue;
+            let maxScore = Math.max(...scores);
+            return scores.indexOf(maxScore);
+        }
+        
+        if (type === 'PIPE_CROSS' || type === 'MIXER') return 0;
+        if (type === 'SPLITTER') {
+            if (w[0]) return 0; if (w[1]) return 1; if (w[2]) return 2; if (w[3]) return 3;
+            if (n[0]) return 0; if (n[1]) return 1; if (n[2]) return 2; if (n[3]) return 3;
+            return 0;
+        }
+        return 0;
+    }
 
-            if (cell.type === 'pipe') {
-                let outDirs = [];
-                let inDir = current.incomingDir;
-                let cType = cell.pipeType;
-                let rot = cell.dir;
+    handleCellClick(x, y) {
+        if (this.isSourceOrTarget(x, y)) return;
+        const cell = this.grid[y][x];
+        const inv = this.currentLevel.inventory;
 
-                if (cType === 'pipes_straight') {
-                    let isOpen = (rot % 2 === 0) ? (inDir === 0 || inDir === 2) : (inDir === 1 || inDir === 3);
-                    if (isOpen && !cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let outDir = (inDir + 2) % 4;
-                        cell.flows[outDir] = current.color;
-                        outDirs.push(outDir);
-                    }
-                } else if (cType === 'pipes_angle') {
-                    let localizedIn = (inDir - rot + 4) % 4;
-                    if ((localizedIn === 0 || localizedIn === 1) && !cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let outDir = ((localizedIn === 0 ? 1 : 0) + rot) % 4;
-                        cell.flows[outDir] = current.color;
-                        outDirs.push(outDir);
-                    }
-                } else if (cType === 'pipes_cross') {
-                    if (!cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let outDir = (inDir + 2) % 4;
-                        cell.flows[outDir] = current.color;
-                        outDirs.push(outDir);
-                    }
-                } else if (cType === 'mixers') {
-                    if (inDir !== rot && !cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let existingColors = Object.keys(cell.flows).filter(d => parseInt(d) !== rot).map(d => cell.flows[d]);
-                        let mixed = this.mixColors(existingColors);
-                        cell.flows[rot] = mixed;
-                        outDirs.push(rot);
-                    }
-                } else if (cType === 'splitters') {
-                    let backSide = (rot + 2) % 4;
-                    if (inDir === backSide && !cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let splits = this.splitColor(current.color);
-                        let leftDir = (rot + 3) % 4;
-                        let rightDir = (rot + 1) % 4;
-                        cell.flows[leftDir] = splits[0];
-                        cell.flows[rightDir] = splits[1] || splits[0];
-                        outDirs.push(leftDir, rightDir);
-                    }
-                } else if (cType === 'valves') {
-                    let mainInput = (rot + 2) % 4;
-                    let sideLeft = (rot + 3) % 4;
-                    let sideRight = (rot + 1) % 4;
+        if (this.activeTool === 'DELETE') {
+            if (cell && cell.type !== 'WALL') {
+                if(cell.type === 'PIPE_STRAIGHT') inv.pipes_straight++;
+                if(cell.type === 'PIPE_ANGLE') inv.pipes_angle++;
+                if(cell.type === 'PIPE_CROSS') inv.pipes_cross++;
+                if(cell.type === 'AND_GATE') inv.andGates++;
+                if(cell.type === 'MIXER') inv.mixers++;
+                if(cell.type === 'SPLITTER') inv.splitters++;
+                if(cell.type === 'PORTAL') inv.portals++;
+                if(cell.type === 'VALVE') inv.valves++;
+                this.grid[y][x] = null;
+                this.audio.playClick();
+                this.clicks--;
+            }
+        } else {
+            if (cell) {
+                if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
+                    cell.rotation = (cell.rotation + 1) % 4;
+                    this.audio.playClick();
+                }
+            } else {
+                let p = false;
+                let rot = this.getBestRotation(x, y, this.activeTool);
+                
+                if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) { this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: rot }; inv.pipes_straight--; p = true; }
+                else if (this.activeTool === 'PIPE_ANGLE' && inv.pipes_angle > 0) { this.grid[y][x] = { type: 'PIPE_ANGLE', rotation: rot }; inv.pipes_angle--; p = true; }
+                else if (this.activeTool === 'PIPE_CROSS' && inv.pipes_cross > 0) { this.grid[y][x] = { type: 'PIPE_CROSS', rotation: 0 }; inv.pipes_cross--; p = true; }
+                else if (this.activeTool === 'AND_GATE' && inv.andGates > 0) { this.grid[y][x] = { type: 'AND_GATE', rotation: 0 }; inv.andGates--; p = true; }
+                else if (this.activeTool === 'MIXER' && inv.mixers > 0) { this.grid[y][x] = { type: 'MIXER', rotation: 0 }; inv.mixers--; p = true; }
+                else if (this.activeTool === 'SPLITTER' && inv.splitters > 0) { this.grid[y][x] = { type: 'SPLITTER', rotation: 0 }; inv.splitters--; p = true; }
+                else if (this.activeTool === 'PORTAL' && inv.portals > 0) { this.grid[y][x] = { type: 'PORTAL', rotation: 0 }; inv.portals--; p = true; }
+                else if (this.activeTool === 'VALVE' && inv.valves > 0) { this.grid[y][x] = { type: 'VALVE', rotation: rot }; inv.valves--; p = true; }
+                
+                if(p) { this.audio.playClick(); this.clicks++; }
+            }
+        }
+        
+        if (this.clicks < 0) this.clicks = 0;
+        this.updateUI();
+        this.calculateFlow(true); 
+    }
+    
+    isSourceOrTarget(x, y) {
+        let isST = false;
+        this.currentLevel.sources.forEach(s => { if(s.x === x && s.y === y) isST = true; });
+        this.currentLevel.targets.forEach(t => { if(t.x === x && t.y === y) isST = true; });
+        return isST;
+    }
 
-                    if (!cell.flows[inDir]) cell.flows[inDir] = current.color;
-
-                    let hasPressure = cell.flows[sideLeft] || cell.flows[sideRight];
-                    if (hasPressure && cell.flows[mainInput]) {
-                        cell.flows[rot] = cell.flows[mainInput];
-                        outDirs.push(rot);
-                    }
-                } else if (cType === 'andGates') {
-                    if (!cell.flows[inDir]) cell.flows[inDir] = current.color;
-                    let activeInputs = Object.keys(cell.flows).filter(d => parseInt(d) !== rot);
-                    if (activeInputs.length >= 2) {
-                        cell.flows[rot] = current.color; 
-                        outDirs.push(rot);
-                    }
-                } else if (cType === 'portals') {
-                    if (!cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                        let other = portalsOnBoard.find(p => p.x !== x || p.y !== y);
-                        if (other) {
-                            let otherCell = this.grid[other.x][other.y];
-                            if(otherCell && !otherCell.flows[inDir]) {
-                                otherCell.flows[inDir] = current.color;
-                                for(let d = 0; d < 4; d++) {
-                                    queue.push({ x: other.x + dx[d], y: other.y + dy[d], incomingDir: (d + 2) % 4, color: current.color });
-                                }
+    
+    getBestRotation(x, y, type) {
+        let connections = [false, false, false, false]; // top, right, bottom, left
+        let waterFlows = [false, false, false, false];
+        const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}]; 
+        
+        DIRS.forEach(move => {
+            let nx = x + move.dx;
+            let ny = y + move.dy;
+            if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
+                let isSource = this.currentLevel.sources.find(s => s.x === nx && s.y === ny);
+                let isTarget = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
+                
+                if (isSource) {
+                    connections[move.d] = true;
+                    waterFlows[move.d] = true; // Sources always have water
+                } else if (isTarget) {
+                    connections[move.d] = true;
+                } else {
+                    let nCell = this.grid[ny][nx];
+                    if (nCell && nCell.type !== 'WALL') {
+                        let ports = this.getPorts(nCell);
+                        let oppDir = (move.d + 2) % 4;
+                        if (ports.includes(oppDir)) {
+                            connections[move.d] = true;
+                            // Check if water is explicitly flowing OUT from that neighbor to us
+                            if (nCell.flows && nCell.flows[oppDir]) {
+                                waterFlows[move.d] = true;
                             }
                         }
                     }
                 }
+            }
+        });
 
-                outDirs.forEach(d => {
-                    queue.push({ x: x + dx[d], y: y + dy[d], incomingDir: (d + 2) % 4, color: cell.flows[d] });
-                });
-            } else if (cell.type === 'target') {
-                if (!cell.flows[current.incomingDir]) {
-                    cell.flows[current.incomingDir] = current.color;
+        if (type === 'PIPE_STRAIGHT' || type === 'VALVE') {
+            // Horizontal vs Vertical
+            let scoreH = (connections[1]?1:0) + (connections[3]?1:0) + (waterFlows[1]?2:0) + (waterFlows[3]?2:0);
+            let scoreV = (connections[0]?1:0) + (connections[2]?1:0) + (waterFlows[0]?2:0) + (waterFlows[2]?2:0);
+            if (scoreH > scoreV) return 1; // Horizontal
+            return 0; // Vertical default
+        }
+        
+        if (type === 'PIPE_ANGLE') {
+            let scores = [0,0,0,0]; // 0:TopRight, 1:RightBottom, 2:BottomLeft, 3:LeftTop
+            
+            // Score based on matching BOTH ports
+            scores[0] = (connections[0]?1:0) + (connections[1]?1:0) + (waterFlows[0]?3:0) + (waterFlows[1]?3:0);
+            scores[1] = (connections[1]?1:0) + (connections[2]?1:0) + (waterFlows[1]?3:0) + (waterFlows[2]?3:0);
+            scores[2] = (connections[2]?1:0) + (connections[3]?1:0) + (waterFlows[2]?3:0) + (waterFlows[3]?3:0);
+            scores[3] = (connections[3]?1:0) + (connections[0]?1:0) + (waterFlows[3]?3:0) + (waterFlows[0]?3:0);
+            
+            let maxScore = Math.max(...scores);
+            if(maxScore > 0) return scores.indexOf(maxScore);
+            return 0; 
+        }
+        return 0;
+    }
+
+    getPorts(cell) {
+        if (!cell) return [];
+        const t = cell.type; const r = cell.rotation || 0;
+        if (t === 'PIPE_STRAIGHT') return r % 2 === 0 ? [1, 3] : [0, 2];
+        if (t === 'PIPE_ANGLE') {
+            if(r === 0) return [0, 1]; if(r === 1) return [1, 2];
+            if(r === 2) return [2, 3]; if(r === 3) return [3, 0];
+        }
+        if (t === 'PIPE_CROSS') return [0, 1, 2, 3];
+        if (t === 'AND_GATE' || t === 'MIXER') return [0, 1, 2, 3];
+        if (t === 'SPLITTER') return [0, 1, 2, 3];
+        if (t === 'VALVE') return [0, 1, 2, 3]; 
+        if (t === 'PORTAL') return [0, 1, 2, 3]; 
+        return [];
+    }
+
+    canConnect(fromX, fromY, toX, toY, dir) {
+        const fromCell = this.grid[fromY] && this.grid[fromY][fromX];
+        const toCell = this.grid[toY] && this.grid[toY][toX];
+        
+        let fromPorts = fromCell ? this.getPorts(fromCell) : [0,1,2,3]; 
+        let toPorts = toCell ? this.getPorts(toCell) : [0,1,2,3];
+
+        const oppDir = (dir + 2) % 4;
+        return fromPorts.includes(dir) && toPorts.includes(oppDir);
+    }
+
+    calculateFlow(silent = true) {
+        if (!this.currentLevel) return;
+        
+        let portals = [];
+        for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
+            for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
+                if(this.grid[r][c] && this.grid[r][c].type !== 'WALL') {
+                    this.grid[r][c].flows = {}; 
+                    this.grid[r][c].inputs = [];
+                    this.grid[r][c].inputOrigins = new Set();
+                    this.grid[r][c].flowDist = 0;
+                    if(this.grid[r][c].type === 'PORTAL') portals.push({x:c, y:r});
                 }
             }
         }
-    }
+        this.currentLevel.targets.forEach(t => t.currentFlow = null);
+        
+        if (!this.isFlowing && !silent) return; 
 
-    mixColors(colors) {
-        if (colors.includes('red') && colors.includes('blue')) return 'purple';
-        if (colors.includes('red') && colors.includes('yellow')) return 'orange';
-        if (colors.includes('blue') && colors.includes('yellow')) return 'green';
-        return colors[0] || 'white';
-    }
+        let queue = [];
+        this.currentLevel.sources.forEach(s => {
+            queue.push({x: s.x, y: s.y, color: s.color, fromDir: null, dist: 0});
+        });
 
-    splitColor(color) {
-        if (color === 'purple') return ['red', 'blue'];
-        if (color === 'orange') return ['red', 'yellow'];
-        if (color === 'green') return ['blue', 'yellow'];
-        return [color, color];
+        let iters = 0;
+        const DIRS = [{dx:0, dy:-1, d:0}, {dx:1, dy:0, d:1}, {dx:0, dy:1, d:2}, {dx:-1, dy:0, d:3}];
+
+        while (queue.length > 0 && iters < 5000) {
+            iters++;
+            let node = queue.shift();
+            let currentCell = this.grid[node.y][node.x];
+            
+            if (currentCell && currentCell.type === 'PORTAL' && portals.length === 2) {
+                if (node.fromDir !== 'portal') {
+                    let other = portals.find(p => p.x !== node.x || p.y !== node.y);
+                    if (other) {
+                        let otherCell = this.grid[other.y][other.x];
+                        if(!otherCell.flows['out']) {
+                            otherCell.flows['out'] = node.color; 
+                            otherCell.flowDist = node.dist + 1;
+                            queue.push({x: other.x, y: other.y, color: node.color, fromDir: 'portal', dist: node.dist + 1});
+                        }
+                    }
+                    continue; 
+                }
+            }
+
+            let availableColors = null;
+            if (node.color === 'split_trigger') {
+                availableColors = [...node.colors];
+            }
+
+            DIRS.forEach(move => {
+                if (node.fromDir !== null && move.d === (node.fromDir + 2) % 4) return; 
+
+                if (currentCell && currentCell.type === 'PIPE_CROSS' && node.fromDir !== null) {
+                    if (move.d !== node.fromDir) return; 
+                }
+                
+                let emitColor = node.color;
+                if (node.color === 'split_trigger') {
+                    if (availableColors.length === 0) return; 
+                    emitColor = availableColors[0];
+                }
+
+                if (currentCell && currentCell.type === 'VALVE') {
+                    let r = currentCell.rotation || 0;
+                    let inline = (r%2===0) ? [1,3] : [0,2];
+                    let control = (r%2===0) ? [0,2] : [1,3];
+                    
+                    if(inline.includes(move.d)) {
+                        let hasPressure = false;
+                        control.forEach(cdir => { if(currentCell.flows[cdir]) hasPressure = true; });
+                        if(!hasPressure) return; 
+                    }
+                }
+
+                let nx = node.x + move.dx;
+                let ny = node.y + move.dy;
+
+                if (nx >= 0 && nx < this.currentLevel.gridSize.cols && ny >= 0 && ny < this.currentLevel.gridSize.rows) {
+                    if (!this.canConnect(node.x, node.y, nx, ny, move.d)) return;
+
+                    const consumeSplit = () => {
+                        if (node.color === 'split_trigger') {
+                            let consumed = availableColors.shift();
+                            if(availableColors.length === 1) currentCell.flows['out1_rendered'] = consumed;
+                            if(availableColors.length === 0) currentCell.flows['out2_rendered'] = consumed;
+                        }
+                    };
+
+                    let target = this.currentLevel.targets.find(t => t.x === nx && t.y === ny);
+                    if (target) {
+                        target.currentFlow = emitColor;
+                        consumeSplit();
+                        return; 
+                    }
+
+                    let cell = this.grid[ny][nx];
+                    if (cell && cell.type !== 'WALL') {
+                        if(cell.flows[move.d] === emitColor) return; 
+                        
+                        if (cell.type.startsWith('PIPE') || cell.type === 'PORTAL') {
+                            cell.flows[move.d] = emitColor; 
+                            cell.flowDist = node.dist + 1;
+                            queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
+                            consumeSplit();
+                        }
+                        else if (cell.type === 'VALVE') {
+                            cell.flows[move.d] = emitColor;
+                            cell.flowDist = node.dist + 1;
+                            let r = cell.rotation || 0;
+                            let inline = (r%2===0) ? [1,3] : [0,2];
+                            let control = (r%2===0) ? [0,2] : [1,3];
+                            
+                            if(inline.includes(move.d)) {
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
+                            } else if (control.includes(move.d)) {
+                                // Control pressure arrived! Wake up inline flow if it's here
+                                inline.forEach(idir => {
+                                    if(cell.flows[idir]) {
+                                        queue.push({x: nx, y: ny, color: cell.flows[idir], fromDir: idir, dist: node.dist + 1});
+                                    }
+                                });
+                            }
+                            consumeSplit();
+                        }
+                        else if (cell.type === 'AND_GATE') {
+                            cell.inputOrigins.add(move.d);
+                            cell.flowDist = node.dist + 1;
+                            if(!cell.inputs.includes(emitColor)) cell.inputs.push(emitColor);
+                            
+                            if (cell.inputOrigins.size >= 2) {
+                                cell.flows['out'] = cell.inputs[0]; 
+                                queue.push({x: nx, y: ny, color: cell.inputs[0], fromDir: null, dist: node.dist + 1});
+                            }
+                            consumeSplit();
+                        }
+                        else if (cell.type === 'MIXER') {
+                            cell.inputOrigins.add(move.d);
+                            cell.flowDist = node.dist + 1;
+                            if (!cell.inputs.includes(emitColor)) cell.inputs.push(emitColor);
+                            
+                            if (cell.inputOrigins.size >= 2) {
+                                let mixed = this.mixColors(cell.inputs[0], cell.inputs[1]);
+                                cell.flows['out'] = mixed;
+                                queue.push({x: nx, y: ny, color: mixed, fromDir: null, dist: node.dist + 1});
+                            } else {
+                                cell.flows['out'] = cell.inputs[0];
+                            }
+                            consumeSplit();
+                        }
+                        else if (cell.type === 'SPLITTER') {
+                            cell.inputOrigins.add(move.d);
+                            cell.flowDist = node.dist + 1;
+                            let unmix = this.unmixColor(emitColor);
+                            if(unmix.length === 2) {
+                                queue.push({x: nx, y: ny, color: 'split_trigger', colors: unmix, fromDir: move.d, dist: node.dist + 1});
+                            } else {
+                                queue.push({x: nx, y: ny, color: emitColor, fromDir: move.d, dist: node.dist + 1});
+                            }
+                            consumeSplit();
+                        }
+                    }
+                }
+            });
+        }
+    }
+    mixColors(c1, c2) {
+        if(c1 === c2) return c1;
+        const mix = { 'blue+yellow': 'green', 'yellow+blue': 'green', 'red+blue': 'purple', 'blue+red': 'purple', 'red+yellow': 'orange', 'yellow+red': 'orange' };
+        return mix[`${c1}+${c2}`] || c1;
+    }
+    
+    unmixColor(c) {
+        if(c === 'green') return ['blue', 'yellow'];
+        if(c === 'purple') return ['blue', 'red'];
+        if(c === 'orange') return ['red', 'yellow'];
+        return [c];
     }
 
     checkWinCondition() {
-        let allMatched = true;
-        this.levelData.targets.forEach(t => {
-            let cell = this.grid[t.x][t.y];
-            let values = Object.values(cell.flows);
-            if (!values.includes(t.requiredColor)) allMatched = false;
+        if (!this.isFlowing) return;
+        let won = true;
+        this.currentLevel.targets.forEach(t => { if (t.currentFlow !== t.requiredColor) won = false; });
+        if (won) {
+            this.audio.playWin();
+            
+            let par = this.currentLevel.parClicks || 10;
+            let earnedStars = 1;
+            
+            if(this.clicks <= par) earnedStars = 3;
+            else if(this.clicks <= par + 2) earnedStars = 2;
+
+            const xp = this.currentLevel.xpReward;
+            
+            if (!this.playerStats.levelStars) this.playerStats.levelStars = {};
+            let prevStars = this.playerStats.levelStars[this.currentLevel.id] || 0;
+            
+            if (earnedStars > prevStars) {
+                this.playerStats.stars += (earnedStars - prevStars); 
+                this.playerStats.levelStars[this.currentLevel.id] = earnedStars;
+            }
+            
+            if (prevStars === 0) {
+                this.playerStats.xp += xp; 
+            } else if (earnedStars > prevStars) {
+                this.playerStats.xp += Math.floor(xp * 0.5); 
+            } else {
+                this.playerStats.xp += 10; 
+            }
+            
+            localStorage.setItem('hydra_stats', JSON.stringify(this.playerStats));
+            this.updateUI();
+            
+            const winTitle = document.getElementById('win-title');
+            const winSub = document.getElementById('win-subtitle');
+            const winXp = document.getElementById('win-xp');
+            
+            [1,2,3].forEach(num => {
+                document.getElementById(`star-${num}`).classList.toggle('filled', num <= earnedStars);
+            });
+            
+            winSub.textContent = `Du hast ${this.clicks} Bauteile verbaut (Optimal: ${par})`;
+            winXp.textContent = prevStars === 0 ? `+${xp} XP` : (earnedStars > prevStars ? `+${Math.floor(xp * 0.5)} XP` : '+10 XP');
+            
+            document.getElementById('win-overlay').classList.remove('hidden');
+            document.getElementById('game-controls').classList.add('hidden');
+        }
+    }
+
+    gameLoop(timestamp) {
+        this.time = timestamp || 0;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        if (this.currentLevel) {
+            this.ctx.save();
+            this.ctx.translate(this.offsetX, this.offsetY);
+            
+            this.drawPlacedComponents();
+            this.drawSourcesAndTargets();
+            
+            this.ctx.restore();
+        }
+        requestAnimationFrame((t) => this.gameLoop(t));
+    }
+    
+    drawCB(x, y, color) {
+        if(!this.playerStats.colorblind) return;
+        const shape = this.shapeMap[color];
+        this.ctx.fillStyle = "rgba(0,0,0,0.6)";
+        this.ctx.beginPath();
+        if(shape==='circle') this.ctx.arc(x,y,5,0,Math.PI*2);
+        else if(shape==='square') this.ctx.rect(x-5,y-5,10,10);
+        else if(shape==='triangle') { this.ctx.moveTo(x,y-6); this.ctx.lineTo(x-5,y+5); this.ctx.lineTo(x+5,y+5); }
+        else if(shape==='diamond') { this.ctx.moveTo(x,y-6); this.ctx.lineTo(x+5,y); this.ctx.lineTo(x,y+6); this.ctx.lineTo(x-5,y); }
+        else this.ctx.arc(x,y,5,0,Math.PI*2); 
+        this.ctx.fill();
+    }
+
+        drawSourcesAndTargets() {
+        const s = this.cellSize;
+        const hw = s / 2;
+        const pW = s * 0.35; // pipe width
+        const hPw = pW / 2;
+        
+        // Animated pulse effect
+        const pulse = Math.sin(this.time / 300) * 0.1 + 0.9;
+        
+        // Base Pipe Material (Metallic) for the stubs
+        const pipeGradientV = this.ctx.createLinearGradient(-hPw, 0, hPw, 0);
+        pipeGradientV.addColorStop(0, '#27272a');
+        pipeGradientV.addColorStop(0.5, '#3f3f46');
+        pipeGradientV.addColorStop(1, '#27272a');
+
+        const pipeGradientH = this.ctx.createLinearGradient(0, -hPw, 0, hPw);
+        pipeGradientH.addColorStop(0, '#27272a');
+        pipeGradientH.addColorStop(0.5, '#3f3f46');
+        pipeGradientH.addColorStop(1, '#27272a');
+
+        this.currentLevel.sources.forEach(source => {
+            const x = source.x * s; const y = source.y * s;
+            const col = this.colorMap[source.color];
+
+            this.ctx.save();
+            this.ctx.translate(x + hw, y + hw);
+            
+            // Draw connection stubs pointing outwards
+            // We check which direction has an open pipe to connect to, or just draw a cross base
+            this.ctx.fillStyle = pipeGradientH;
+            this.ctx.fillRect(-hw, -hPw, s, pW); // Horizontal base
+            this.ctx.fillStyle = pipeGradientV;
+            this.ctx.fillRect(-hPw, -hw, pW, s); // Vertical base
+            
+            // Central Connector Hub
+            this.ctx.fillStyle = "#18181b";
+            this.ctx.beginPath(); this.ctx.roundRect(-hPw-4, -hPw-4, pW+8, pW+8, 8); this.ctx.fill();
+            this.ctx.strokeStyle = "#3f3f46"; this.ctx.lineWidth = 2; this.ctx.stroke();
+
+            // Outer glow ring
+            this.ctx.shadowBlur = 20;
+            this.ctx.shadowColor = col;
+            this.ctx.strokeStyle = col;
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath(); 
+            this.ctx.arc(0, 0, s*0.35 * pulse, 0, Math.PI * 2); 
+            this.ctx.stroke();
+            this.ctx.shadowBlur = 0;
+            
+            // Inner core
+            this.ctx.fillStyle = col;
+            this.ctx.beginPath(); 
+            this.ctx.arc(0, 0, s*0.22, 0, Math.PI * 2); 
+            this.ctx.fill();
+            
+            // Highlight
+            this.ctx.fillStyle = "rgba(255,255,255,0.8)";
+            this.ctx.beginPath(); 
+            this.ctx.arc(-s*0.08, -s*0.08, s*0.05, 0, Math.PI * 2); 
+            this.ctx.fill();
+
+            this.drawCB(0, 0, source.color);
+            this.ctx.restore();
         });
 
-        if (allMatched && this.levelData.targets.length > 0) {
-            this.handleWin();
-        }
+        this.currentLevel.targets.forEach(target => {
+            const x = target.x * s; const y = target.y * s;
+            const reqCol = this.colorMap[target.requiredColor];
+
+            this.ctx.save();
+            this.ctx.translate(x + hw, y + hw);
+            
+            // Draw connection stubs pointing outwards
+            this.ctx.fillStyle = pipeGradientH;
+            this.ctx.fillRect(-hw, -hPw, s, pW); // Horizontal base
+            this.ctx.fillStyle = pipeGradientV;
+            this.ctx.fillRect(-hPw, -hw, pW, s); // Vertical base
+
+            // Central Connector Hub
+            this.ctx.fillStyle = "#18181b";
+            this.ctx.beginPath(); this.ctx.roundRect(-hPw-4, -hPw-4, pW+8, pW+8, 8); this.ctx.fill();
+            this.ctx.strokeStyle = "#3f3f46"; this.ctx.lineWidth = 2; this.ctx.stroke();
+
+            // Hexagon Target Receptacle
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = reqCol;
+            this.ctx.strokeStyle = reqCol;
+            this.ctx.lineWidth = 3;
+            
+            this.ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = 2 * Math.PI / 6 * i;
+                const hx = s * 0.4 * Math.cos(angle);
+                const hy = s * 0.4 * Math.sin(angle);
+                if (i === 0) this.ctx.moveTo(hx, hy);
+                else this.ctx.lineTo(hx, hy);
+            }
+            this.ctx.closePath();
+            this.ctx.stroke();
+            this.ctx.shadowBlur = 0;
+            
+            // Inner dark circle
+            this.ctx.fillStyle = "#09090b";
+            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.3, 0, Math.PI * 2); this.ctx.fill();
+
+            let isFilled = target.currentFlow;
+            if(this.isFlowing && this.flowAnimationProgress < 90) isFilled = false;
+
+            if (isFilled) {
+                const fillCol = this.colorMap[target.currentFlow];
+                this.ctx.shadowBlur = 25;
+                this.ctx.shadowColor = fillCol;
+                this.ctx.fillStyle = fillCol;
+                this.ctx.beginPath(); 
+                this.ctx.arc(0, 0, s*0.25 * pulse, 0, Math.PI * 2); 
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            } else {
+                // Dashed outline for required color
+                this.ctx.strokeStyle = reqCol;
+                this.ctx.lineWidth = 2; 
+                this.ctx.setLineDash([4, 4]);
+                this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.2, 0, Math.PI * 2); this.ctx.stroke();
+                this.ctx.setLineDash([]);
+            }
+            
+            this.drawCB(0, 0, target.requiredColor);
+            this.ctx.restore();
+        });
     }
 
-    handleWin() {
-        this.audio.playWin();
-        let stars = 1;
-        if (this.clickCount <= this.levelData.parClicks) stars = 3;
-        else if (this.clickCount <= this.levelData.parClicks + 2) stars = 2;
-
-        let key = `${this.currentChapter}_${this.currentLevelIndex}`;
-        let previousStars = this.solvedLevels[key] || 0;
-
-        if (stars > previousStars) {
-            this.solvedLevels[key] = stars;
-            this.totalXP += this.levelData.xpReward || 100;
-            localStorage.setItem('hydra_xp', this.totalXP);
-            localStorage.setItem('hydra_solved', JSON.stringify(this.solvedLevels));
-        }
-
-        document.getElementById('win-xp-reward').innerText = `+${this.levelData.xpReward || 100} XP`;
-        const container = document.getElementById('win-stars-container');
-        container.innerHTML = '⭐'.repeat(stars);
-
-        this.updateTopBar();
-        document.getElementById('modal-win').classList.remove('hidden');
-    }
-
-    nextLevel() {
-        let nextIndex = this.currentLevelIndex + 1;
-        if (nextIndex < this.chapters[this.currentChapter].levels.length) {
-            this.startLevel(this.currentChapter, nextIndex);
-        } else {
-            this.returnToMenu();
-        }
-    }
-
-    resetLevel() {
-        this.startLevel(this.currentChapter, this.currentLevelIndex);
-    }
-
-    returnToMenu() {
-        this.isFlowing = false;
-        clearInterval(this.animationTimer);
-        document.getElementById('flow-btn').innerText = "Fluss Starten";
-        document.getElementById('game-controls').classList.add('hidden');
-        document.getElementById('level-selection').classList.remove('hidden');
-        this.currentChapter = null;
-        this.renderLevelList();
-    }
-
-    showProfile() {
-        const nameInput = document.getElementById('profile-name-input');
-        if (nameInput) {
-            nameInput.value = localStorage.getItem('hydra_agent_name') || 'Agent-X';
-        }
-
-        // Grid für Emoji Avatar-Picker rendern
-        const pickerGrid = document.getElementById('avatar-picker-grid');
-        if (pickerGrid) {
-            pickerGrid.innerHTML = '';
-            this.availAvatars.forEach(emoji => {
-                const item = document.createElement('button');
-                item.className = `p-2 text-xl rounded-lg text-center transition-all border ${emoji === this.selectedAvatar ? 'bg-cyan-950 border-cyan-500' : 'bg-zinc-900 border-transparent hover:border-zinc-700'}`;
-                item.innerText = emoji;
-                item.addEventListener('click', () => {
-                    this.audio.playClick();
-                    this.selectedAvatar = emoji;
-                    this.showProfile(); // Re-render highlights
-                });
-                pickerGrid.appendChild(item);
-            });
-        }
-
-        let rankTitle = "Novize";
-        if (this.totalXP > 4000) rankTitle = "Großmeister-Kybernetiker";
-        else if (this.totalXP > 1500) rankTitle = "System-Architekt";
-        else if (this.totalXP > 500) rankTitle = "Feld-Techniker";
+    drawPlacedComponents() {
+        const s = this.cellSize;
+        const hw = s / 2; 
         
-        document.getElementById('modal-xp-rank').innerText = rankTitle;
-        document.getElementById('modal-xp').innerText = `${this.totalXP} XP`;
-        
-        let starCount = Object.values(this.solvedLevels).reduce((a, b) => a + b, 0);
-        document.getElementById('modal-stars').innerText = starCount;
-        document.getElementById('modal-profile').classList.remove('hidden');
-    }
+        for(let r=0; r<this.currentLevel.gridSize.rows; r++) {
+            for(let c=0; c<this.currentLevel.gridSize.cols; c++) {
+                const cell = this.grid[r][c];
+                if (!cell) {
+                    // Draw subtle grid point
+                    this.ctx.strokeStyle = "rgba(6, 182, 212, 0.4)";
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.fillStyle = "rgba(6, 182, 212, 0.05)";
+                    this.ctx.setLineDash([4, 4]);
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(c*s + 4, r*s + 4, s - 8, s - 8, 8);
+                    this.ctx.stroke();
+                    this.ctx.fill();
+                    this.ctx.setLineDash([]);
+                    continue;
+                }
+                const x = c * s; const y = r * s;
 
-    saveProfile() {
-        const nameInput = document.getElementById('profile-name-input');
-        if (nameInput) {
-            localStorage.setItem('hydra_agent_name', nameInput.value.trim() || 'Agent-X');
-        }
-        localStorage.setItem('hydra_avatar', this.selectedAvatar);
-        document.getElementById('modal-profile').classList.add('hidden');
-        this.updateTopBar();
-    }
-
-    resetAllData() {
-        if (confirm("Fortschritt wirklich restlos löschen?")) {
-            localStorage.clear();
-            this.totalXP = 0;
-            this.solvedLevels = {};
-            this.currentChapter = null;
-            this.selectedAvatar = '🕵️';
-            this.updateTopBar();
-            document.getElementById('modal-profile').classList.add('hidden');
-            this.renderLevelList();
-        }
-    }
-
-    drawCB(x, y, color) {
-        this.ctx.save();
-        this.ctx.shadowBlur = 8;
-        this.ctx.shadowColor = this.colorMap[color];
-        this.ctx.fillStyle = this.colorMap[color];
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, 3, 0, Math.PI * 2);
-        this.ctx.fill();
-        this.ctx.restore();
-    }
-
-    draw() {
-        if (!this.levelData) return;
-        const cols = this.levelData.gridSize.cols;
-        const rows = this.levelData.gridSize.rows;
-        const s = this.canvas.width / cols;
-
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        for (let x = 0; x < cols; x++) {
-            for (let y = 0; y < rows; y++) {
-                const cell = this.grid[x][y];
-                if (!cell) continue;
-                const cx = x * s + s / 2;
-                const cy = y * s + s / 2;
+                if (cell.type === 'WALL') {
+                    this.ctx.fillStyle = "#18181b"; // darker zinc
+                    this.ctx.fillRect(x+2, y+2, s-4, s-4);
+                    // Tech pattern for wall
+                    this.ctx.strokeStyle = "#27272a"; 
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath(); this.ctx.moveTo(x+4, y+4); this.ctx.lineTo(x+s-4, y+s-4); this.ctx.stroke();
+                    this.ctx.beginPath(); this.ctx.moveTo(x+s-4, y+4); this.ctx.lineTo(x+4, y+s-4); this.ctx.stroke();
+                    continue;
+                }
 
                 this.ctx.save();
-                this.ctx.translate(cx, cy);
+                this.ctx.translate(x + hw, y + hw);
+                
+                if (cell.rotation !== undefined && ['PIPE_STRAIGHT', 'PIPE_ANGLE', 'VALVE'].includes(cell.type)) {
+                    this.ctx.rotate(cell.rotation * Math.PI / 2);
+                }
 
-                if (cell.type === 'wall') {
-                    this.ctx.fillStyle = '#1c1c1e';
-                    this.ctx.fillRect(-s/2 + 2, -s/2 + 2, s - 4, s - 4);
-                } else if (cell.type === 'source') {
-                    let col = this.colorMap[cell.color];
-                    this.ctx.fillStyle = col;
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s * 0.3, 0, Math.PI * 2); this.ctx.fill();
-                } else if (cell.type === 'target') {
-                    let col = this.colorMap[cell.requiredColor];
-                    this.ctx.strokeStyle = col; this.ctx.lineWidth = 3;
-                    this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
+                const pW = s * 0.35; 
+                const hPw = pW / 2;
+                
+                let wCol = null;
+                if(cell.flows && Object.keys(cell.flows).length > 0) { 
+                    wCol = Object.values(cell.flows)[0]; 
+                }
+                
+                let showWater = wCol && (!this.isFlowing || this.flowAnimationProgress > 10); 
+                
+                // Base Pipe Material (Metallic)
+                const pipeGradient = this.ctx.createLinearGradient(-hPw, 0, hPw, 0);
+                pipeGradient.addColorStop(0, '#27272a');
+                pipeGradient.addColorStop(0.5, '#3f3f46');
+                pipeGradient.addColorStop(1, '#27272a');
+
+                if (cell.type === 'PIPE_STRAIGHT') {
+                    // Pipe Body
+                    this.ctx.fillStyle = pipeGradient;
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
+                    // Rims
+                    this.ctx.fillStyle = "#52525b"; 
+                    this.ctx.fillRect(-hw, -hPw, 4, pW); this.ctx.fillRect(hw-4, -hPw, 4, pW);
                     
-                    // Der wunderschöne pulsierende Zielknoten-Neon-Glow aus Version 13.4
+                    if(showWater) { 
+                        const fillCol = this.colorMap[wCol];
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
+                        this.ctx.fillStyle = fillCol; 
+                        let localProgress = 1;
+                        if(this.isFlowing) {
+                            let startAnim = (cell.flowDist || 0) * 3; 
+                            localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                        }
+                        let l = localProgress * s;
+                        this.ctx.fillRect(-hw, -hPw + 6, l, pW - 12); 
+                        this.ctx.shadowBlur = 0;
+                        
+                        // Add animated flowing particles
+                        if(this.isFlowing && this.flowAnimationProgress > 20) {
+                            this.ctx.fillStyle = "rgba(255,255,255,0.8)";
+                            const px = -hw + ((this.time/10) % s);
+                            if(px < -hw + l) {
+                                this.ctx.beginPath(); this.ctx.arc(px, 0, 2, 0, Math.PI*2); this.ctx.fill();
+                            }
+                        }
+                        this.drawCB(0, 0, wCol);
+                    }
+                } 
+                else if (cell.type === 'PIPE_ANGLE') {
+                    this.ctx.fillStyle = pipeGradient; 
+                    this.ctx.fillRect(-hPw, -hw, pW, hw + hPw); 
+                    this.ctx.fillRect(-hPw, -hPw, hw + hPw, pW);
+                    
+                    // Outer Corner smoothing visual
+                    this.ctx.fillStyle = "#3f3f46";
+                    this.ctx.beginPath(); this.ctx.arc(-hPw, -hPw, pW, 0, Math.PI/2); this.ctx.fill();
+
+                    if(showWater) { 
+                        const fillCol = this.colorMap[wCol];
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = fillCol;
+                        this.ctx.fillStyle = fillCol;
+                        let localProgress = 1;
+                        if(this.isFlowing) {
+                            let startAnim = (cell.flowDist || 0) * 3; 
+                            localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                        }
+                        let scale = localProgress;
+                        this.ctx.fillRect(-hPw + 6, -hw, pW - 12, (hw + hPw - 6)*scale);
+                        this.ctx.fillRect(-hPw + 6, -hPw + 6, (hw + hPw - 6)*scale, pW - 12);
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(-4, -4, wCol);
+                    }
+                }
+                else if (cell.type === 'PIPE_CROSS') {
+                    this.ctx.fillStyle = pipeGradient; 
+                    this.ctx.fillRect(-hPw, -hw, pW, s); 
+                    this.ctx.fillRect(-hw, -hPw, s, pW);
+                    
+                    // Central Joint
+                    this.ctx.fillStyle = "#52525b";
+                    this.ctx.fillRect(-hPw-2, -hPw-2, pW+4, pW+4);
+                    
+                    let flowV = (cell.flows && (cell.flows[0] || cell.flows[2]));
+                    let flowH = (cell.flows && (cell.flows[1] || cell.flows[3]));
+                    let localProgress = 1;
+                    if(this.isFlowing) {
+                        let startAnim = (cell.flowDist || 0) * 3; 
+                        localProgress = Math.max(0, Math.min(1, (this.flowAnimationProgress - startAnim) / 10));
+                    }
+                    let animP = localProgress * s;
+                    
+                    if(flowV && (!this.isFlowing || this.flowAnimationProgress > 10)) { 
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[flowV];
+                        this.ctx.fillStyle = this.colorMap[flowV]; 
+                        this.ctx.fillRect(-hPw + 6, -hw, pW - 12, animP); 
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(0, -hw/2, flowV); 
+                    }
+                    if(flowH && (!this.isFlowing || this.flowAnimationProgress > 10)) { 
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[flowH];
+                        this.ctx.fillStyle = this.colorMap[flowH]; 
+                        this.ctx.fillRect(-hw, -hPw + 6, animP, pW - 12); 
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(-hw/2, 0, flowH); 
+                    }
+                }
+                else if (cell.type === 'VALVE') {
+                    this.ctx.fillStyle = pipeGradient; this.ctx.fillRect(-hw, -hPw, s, pW); 
+                    // Central mechanism
+                    this.ctx.fillStyle = "#18181b"; this.ctx.fillRect(-hPw, -hw, pW, s); 
+                    this.ctx.strokeStyle = "#52525b"; this.ctx.lineWidth = 4; this.ctx.strokeRect(-hPw, -hw, pW, s);
+                    
+                    // Red dial
+                    this.ctx.fillStyle = "#ef4444"; 
+                    this.ctx.beginPath(); this.ctx.arc(0,0,hPw-2, 0, Math.PI*2); this.ctx.fill();
+                    
+                    let inlineFlow = (cell.flows && (cell.flows[1] || cell.flows[3]));
+                    if(inlineFlow && (!this.isFlowing || this.flowAnimationProgress > 40)) {
+                        this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[inlineFlow];
+                        this.ctx.fillStyle = this.colorMap[inlineFlow];
+                        this.ctx.fillRect(-hw, -hPw + 6, s, pW - 12);
+                        this.ctx.shadowBlur = 0;
+                        // Turn the dial to show it's open
+                        this.ctx.fillStyle = "#b91c1c";
+                        this.ctx.fillRect(-hPw+4, -2, pW-8, 4);
+                    } else {
+                        // Closed dial
+                        this.ctx.fillStyle = "#b91c1c";
+                        this.ctx.fillRect(-2, -hPw+4, 4, pW-8);
+                    }
+                }
+                else if (cell.type === 'AND_GATE' || cell.type === 'MIXER' || cell.type === 'SPLITTER') {
+                    // Futuristic Device Base
+                    this.ctx.fillStyle = "#27272a"; 
+                    this.ctx.beginPath(); this.ctx.roundRect(-hw+5, -hw+5, s-10, s-10, 10); this.ctx.fill();
+                    this.ctx.strokeStyle = "#06b6d4"; this.ctx.lineWidth = 2; this.ctx.stroke();
+                    
+                    if (cell.type === 'AND_GATE') {
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI * 2); this.ctx.fill();
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 18px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("&", 0, 6);
+                        
+                        if(cell.flows && cell.flows['out'] && (!this.isFlowing || this.flowAnimationProgress > 60)) {
+                            this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[cell.flows['out']];
+                            this.ctx.fillStyle = this.colorMap[cell.flows['out']];
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI * 2); this.ctx.fill();
+                            this.ctx.shadowBlur = 0;
+                            this.drawCB(0,0,cell.flows['out']);
+                        }
+                    } else if (cell.type === 'MIXER') {
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.fillRect(-s*0.25, -s*0.25, s*0.5, s*0.5);
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 12px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("MIX", 0, 4);
+                        if(cell.flows && cell.flows['out'] && (!this.isFlowing || this.flowAnimationProgress > 60)) {
+                            this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[cell.flows['out']];
+                            this.ctx.fillStyle = this.colorMap[cell.flows['out']]; 
+                            this.ctx.fillRect(-s*0.3, -s*0.3, s*0.6, s*0.6);
+                            this.ctx.shadowBlur = 0;
+                            this.drawCB(0,0,cell.flows['out']);
+                        }
+                    } else if (cell.type === 'SPLITTER') {
+                        this.ctx.fillStyle = "#0891b2"; this.ctx.beginPath(); this.ctx.moveTo(0,-s*0.25); this.ctx.lineTo(s*0.25,s*0.25); this.ctx.lineTo(-s*0.25,s*0.25); this.ctx.fill();
+                        this.ctx.fillStyle = "#fff"; this.ctx.font = "bold 10px Arial"; this.ctx.textAlign = "center"; this.ctx.fillText("SPLIT", 0, s*0.15);
+                        
+                        if(cell.flows && (!this.isFlowing || this.flowAnimationProgress > 60)) {
+                            if(cell.flows['out1_rendered']) {
+                                this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[cell.flows['out1_rendered']];
+                                this.ctx.fillStyle = this.colorMap[cell.flows['out1_rendered']];
+                                this.ctx.beginPath(); this.ctx.arc(-s*0.2, s*0.2, 8, 0, Math.PI*2); this.ctx.fill();
+                                this.ctx.shadowBlur = 0;
+                                this.drawCB(-s*0.2, s*0.2, cell.flows['out1_rendered']);
+                            }
+                            if(cell.flows['out2_rendered']) {
+                                this.ctx.shadowBlur = 15; this.ctx.shadowColor = this.colorMap[cell.flows['out2_rendered']];
+                                this.ctx.fillStyle = this.colorMap[cell.flows['out2_rendered']];
+                                this.ctx.beginPath(); this.ctx.arc(s*0.2, s*0.2, 8, 0, Math.PI*2); this.ctx.fill();
+                                this.ctx.shadowBlur = 0;
+                                this.drawCB(s*0.2, s*0.2, cell.flows['out2_rendered']);
+                            }
+                        }
+                    }
+                }
+                else if (cell.type === 'PORTAL') {
+                    // Teleportation Ring
+                    this.ctx.shadowBlur = 20; this.ctx.shadowColor = "#a855f7";
+                    this.ctx.strokeStyle = "#a855f7"; this.ctx.lineWidth = 4;
+                    this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.35, 0, Math.PI*2); this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                    
+                    // Rotating Inner portal
+                    this.ctx.rotate(this.time / 500);
+                    this.ctx.fillStyle = "#d8b4fe";
+                    this.ctx.beginPath(); this.ctx.moveTo(0, -s*0.2); this.ctx.lineTo(s*0.15, s*0.1); this.ctx.lineTo(-s*0.15, s*0.1); this.ctx.fill();
+                    
                     if(cell.flows && Object.keys(cell.flows).length > 0 && (!this.isFlowing || this.flowAnimationProgress > 30)) {
                         let c = Object.values(cell.flows)[0];
                         this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[c];
                         this.ctx.fillStyle = this.colorMap[c];
                         this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI*2); this.ctx.fill();
                         this.ctx.shadowBlur = 0;
-                        this.drawCB(0, 0, c);
-                    }
-                } else if (cell.type === 'pipe') {
-                    this.ctx.rotate(cell.dir * Math.PI / 2);
-                    this.ctx.strokeStyle = '#3f3f46';
-                    this.ctx.lineWidth = s * 0.25;
-                    this.ctx.lineCap = 'round';
-
-                    let isFlowing = this.isFlowing && Object.keys(cell.flows).length > 0;
-                    let flowColors = Object.values(cell.flows);
-
-                    if (cell.pipeType === 'pipes_straight') {
-                        this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                        if (isFlowing) {
-                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
-                            this.ctx.lineWidth = s * 0.14;
-                            this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                        }
-                    } else if (cell.pipeType === 'pipes_angle') {
-                        this.ctx.beginPath(); this.ctx.arc(-s/2, -s/2, s/2, 0, Math.PI / 2); this.ctx.stroke();
-                        if (isFlowing) {
-                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
-                            this.ctx.lineWidth = s * 0.14;
-                            this.ctx.beginPath(); this.ctx.arc(-s/2, -s/2, s/2, 0, Math.PI / 2); this.ctx.stroke();
-                        }
-                    } else if (cell.pipeType === 'pipes_cross') {
-                        this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                        this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
-                        if (isFlowing) {
-                            this.ctx.lineWidth = s * 0.14;
-                            if (cell.flows[0] || cell.flows[2]) {
-                                this.ctx.strokeStyle = this.colorMap[cell.flows[0] || cell.flows[2]];
-                                this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                            }
-                            if (cell.flows[1] || cell.flows[3]) {
-                                this.ctx.strokeStyle = this.colorMap[cell.flows[1] || cell.flows[3]];
-                                this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
-                            }
-                        }
-                    } else {
-                        // Original-Kombinator Gehäuse & Symbole aus v13.4
-                        this.ctx.fillStyle = '#27272a';
-                        this.ctx.fillRect(-s/3, -s/3, s*2/3, s*2/3);
-                        this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
-                        
-                        this.ctx.fillStyle = '#71717a';
-                        this.ctx.font = `bold ${s*0.22}px sans-serif`;
-                        this.ctx.textAlign = 'center';
-                        this.ctx.textBaseline = 'middle';
-                        let sym = '?';
-                        if (cType === 'mixers') sym = '🧪';
-                        if (cType === 'splitters') sym = '⚗️';
-                        if (cType === 'valves') sym = '🛑';
-                        if (cType === 'andGates') sym = '＆';
-                        if (cType === 'portals') sym = '🌀';
-                        this.ctx.fillText(sym, 0, 0);
-
-                        if(isFlowing && flowColors.length > 0) {
-                            let activeCol = cell.flows[cell.dir] || flowColors[0];
-                            this.ctx.fillStyle = this.colorMap[activeCol];
-                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.16, 0, Math.PI*2); this.ctx.fill();
-                            this.drawCB(0, 0, activeCol);
-                        }
+                        this.drawCB(0,0,c);
                     }
                 }
+
                 this.ctx.restore();
             }
         }
@@ -749,7 +1317,7 @@ class HydraGame {
 
 window.addEventListener('DOMContentLoaded', () => {
     window.gameInstance = new HydraGame();
-    
+
     const menuBtn = document.getElementById('menu-btn');
     if(menuBtn) {
         menuBtn.addEventListener('click', () => {
@@ -762,6 +1330,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('[PWA] Service Worker aktiv (Network-First)'))
+            .catch(err => console.error('[PWA] SW Fehler:', err));
     }
 });
