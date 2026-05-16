@@ -1,59 +1,50 @@
 class AudioEngine {
     constructor() {
-        this.ctx = null;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.enabled = true;
     }
     
-    init() {
-        if (!this.ctx) {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
-    
     playClick() {
-        this.init();
-        if (!this.enabled || !this.ctx || this.ctx.state === 'suspended') return;
+        if (!this.enabled || this.ctx.state === 'suspended') return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine'; osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
         osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.1);
     }
     
     playFlowStart() {
-        this.init();
-        if (!this.enabled || !this.ctx || this.ctx.state === 'suspended') return;
+        if (!this.enabled || this.ctx.state === 'suspended') return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle'; osc.frequency.setValueAtTime(200, this.ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(450, this.ctx.currentTime + 0.4);
+        osc.frequency.linearRampToValueAtTime(400, this.ctx.currentTime + 0.5);
         gain.gain.setValueAtTime(0, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.4, this.ctx.currentTime + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+        gain.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
         osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.5);
     }
 
     playWin() {
-        this.init();
-        if (!this.enabled || !this.ctx || this.ctx.state === 'suspended') return;
+        if (!this.enabled || this.ctx.state === 'suspended') return;
         const now = this.ctx.currentTime;
         const playNote = (freq, start, duration) => {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + start);
-            gain.gain.setValueAtTime(0.3, now + start);
+            gain.gain.setValueAtTime(0.4, now + start);
             gain.gain.exponentialRampToValueAtTime(0.01, now + start + duration);
             osc.connect(gain); gain.connect(this.ctx.destination);
             osc.start(now + start); osc.stop(now + start + duration);
         };
-        playNote(523.25, 0, 0.15); // C5
-        playNote(659.25, 0.12, 0.15); // E5
-        playNote(783.99, 0.24, 0.15); // G5
-        playNote(1046.50, 0.36, 0.4); // C6
+        playNote(523.25, 0, 0.15);
+        playNote(659.25, 0.12, 0.15);
+        playNote(783.99, 0.24, 0.15);
+        playNote(1046.50, 0.36, 0.4);
     }
 }
 
@@ -61,7 +52,7 @@ class HydraGame {
     constructor() {
         this.audio = new AudioEngine();
         
-        // Kapitel-Struktur registrieren
+        // Kapitel-Konfiguration verknüpfen
         this.chapters = {
             tutorial: { id: 'tutorial', title: '1. Tutorial', levels: typeof LEVELS_TUTORIAL !== 'undefined' ? LEVELS_TUTORIAL : [], icon: '📖', desc: 'Grundlagen & Element-Mechaniken' },
             standard: { id: 'standard', title: '2. Standard', levels: typeof LEVELS_STANDARD !== 'undefined' ? LEVELS_STANDARD : [], icon: '🔧', desc: 'Geraden & Bögen stetig schwerer' },
@@ -75,11 +66,11 @@ class HydraGame {
         this.currentLevelIndex = 0;
         this.levelData = null;
         
-        // Progress State
+        // Fortschritt laden
         this.totalXP = parseInt(localStorage.getItem('hydra_xp')) || 0;
-        this.solvedLevels = JSON.parse(localStorage.getItem('hydra_solved')) || {}; // Format: { "chapter_index": stars }
+        this.solvedLevels = JSON.parse(localStorage.getItem('hydra_solved')) || {};
         
-        // Gameplay State
+        // Gameplay Variablen
         this.grid = [];
         this.inventory = {};
         this.selectedTool = null;
@@ -88,7 +79,6 @@ class HydraGame {
         this.flowAnimationProgress = 0;
         this.animationTimer = null;
 
-        // UI Mapping
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.colorMap = {
@@ -105,15 +95,14 @@ class HydraGame {
     }
 
     initEvents() {
-        // Canvas Interaktion
         this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-        
-        // Buttons
         document.getElementById('reset-btn').addEventListener('click', () => this.resetLevel());
         document.getElementById('flow-btn').addEventListener('click', () => this.toggleFlow());
-        document.getElementById('menu-btn').addEventListener('click', () => this.returnToMenu());
         document.getElementById('profile-btn').addEventListener('click', () => this.showProfile());
         document.getElementById('btn-close-profile').addEventListener('click', () => {
+            document.getElementById('modal-profile').classList.add('hidden');
+        });
+        document.getElementById('btn-save-profile').addEventListener('click', () => {
             document.getElementById('modal-profile').classList.add('hidden');
         });
         document.getElementById('btn-reset-progress').addEventListener('click', () => this.resetAllData());
@@ -135,7 +124,6 @@ class HydraGame {
         gridContainer.innerHTML = '';
 
         if (this.currentChapter === null) {
-            // KAPITELÜBERSICHT ANZEIGEN
             menuTitle.innerText = "Wähle ein Kapitel";
             gridContainer.className = "grid grid-cols-1 gap-3 p-1 max-h-[68vh] overflow-y-auto w-full";
 
@@ -164,12 +152,10 @@ class HydraGame {
                 gridContainer.appendChild(card);
             });
         } else {
-            // LEVEL-GRID DES AUSGEWÄHLTEN KAPITELS ANZEIGEN
             const chap = this.chapters[this.currentChapter];
             menuTitle.innerText = chap.title;
             gridContainer.className = "grid grid-cols-4 gap-2.5 p-1 max-h-[68vh] overflow-y-auto w-full";
 
-            // Zurück-Button
             const backBtn = document.createElement('button');
             backBtn.className = "col-span-full py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-cyan-400 transition-colors";
             backBtn.innerHTML = `⬅ Zurück zur Kapitelübersicht`;
@@ -180,7 +166,6 @@ class HydraGame {
             });
             gridContainer.appendChild(backBtn);
 
-            // Level Buttons
             chap.levels.forEach((level, index) => {
                 const btn = document.createElement('button');
                 let key = `${this.currentChapter}_${index}`;
@@ -188,7 +173,7 @@ class HydraGame {
 
                 let borderStyle = "border-zinc-900 text-zinc-400 hover:border-zinc-700";
                 if (isSolved > 0) borderStyle = "border-emerald-500/40 bg-emerald-950/10 text-emerald-400";
-                else if (index === 0 || this.solvedLevels[`${this.currentChapter}_${index-1}`]) {
+                else if (index === 0 || this.solvedLevels位 !== undefined || this.solvedLevels[`${this.currentChapter}_${index-1}`]) {
                     borderStyle = "border-zinc-800 text-slate-200 hover:border-cyan-500";
                 }
 
@@ -221,17 +206,14 @@ class HydraGame {
         
         if (!this.levelData) return;
 
-        // Reset Simulation & Counts
         this.clickCount = 0;
         this.isFlowing = false;
         this.flowAnimationProgress = 0;
         if (this.animationTimer) clearInterval(this.animationTimer);
 
-        // Inventar laden
         this.inventory = { ...this.levelData.inventory };
         this.selectedTool = Object.keys(this.inventory).find(k => this.inventory[k] > 0) || null;
 
-        // Spielfeld initialisieren
         this.grid = [];
         const cols = this.levelData.gridSize.cols;
         const rows = this.levelData.gridSize.rows;
@@ -243,12 +225,10 @@ class HydraGame {
             }
         }
 
-        // Mauern platzieren
         this.levelData.walls.forEach(w => {
             if (this.grid[w.x] && this.grid[w.x][w.y]) this.grid[w.x][w.y].type = 'wall';
         });
 
-        // Quellen platzieren
         this.levelData.sources.forEach(s => {
             if (this.grid[s.x] && this.grid[s.x][s.y]) {
                 this.grid[s.x][s.y].type = 'source';
@@ -256,7 +236,6 @@ class HydraGame {
             }
         });
 
-        // Ziele platzieren
         this.levelData.targets.forEach(t => {
             if (this.grid[t.x] && this.grid[t.x][t.y]) {
                 this.grid[t.x][t.y].type = 'target';
@@ -264,10 +243,9 @@ class HydraGame {
             }
         });
 
-        // UI aktualisieren
         document.getElementById('level-selection').classList.add('hidden');
         document.getElementById('game-controls').classList.remove('hidden');
-        document.getElementById('game-level-title').innerText = `${this.chapters[chapterId].title.split(' ')[1]} - Sektor ${index + 1}`;
+        document.getElementById('game-level-title').innerText = `Sektor ${index + 1}`;
         document.getElementById('game-level-hint').innerText = this.levelData.hint || 'Verbinde die Energieströme.';
         
         this.updateInventoryUI();
@@ -289,7 +267,7 @@ class HydraGame {
         };
 
         Object.keys(this.inventory).forEach(key => {
-            if (this.inventory[key] === undefined) return;
+            if (this.inventory[key] === undefined || this.inventory[key] === 0) return;
             const btn = document.createElement('button');
             const isActive = this.selectedTool === key;
             
@@ -310,7 +288,7 @@ class HydraGame {
     }
 
     updateClicksUI() {
-        document.getElementById('game-clicks-display').innerText = `Klicks: ${this.clickCount} / Ziel: ${this.levelData.parClicks}`;
+        document.getElementById('game-clicks-display').innerText = `${this.clickCount} / ${this.levelData.parClicks}`;
     }
 
     handleCanvasClick(e) {
@@ -330,26 +308,23 @@ class HydraGame {
         if (x < 0 || x >= cols || y < 0 || y >= rows) return;
         const cell = this.grid[x][y];
 
-        this.audio.playClick();
-
         if (cell.type === 'empty' && this.selectedTool && this.inventory[this.selectedTool] > 0) {
-            // Platziere Rohr
+            this.audio.playClick();
             cell.type = 'pipe';
             cell.pipeType = this.selectedTool;
             cell.dir = 0;
             this.inventory[this.selectedTool]--;
             this.clickCount++;
         } else if (cell.type === 'pipe') {
-            if (cell.pipeType === this.selectedTool) {
-                // Rotieren
-                cell.dir = (cell.dir + 1) % 4;
-                this.clickCount++;
-            } else {
-                // Löschen / Zurück ins Inventar
+            this.audio.playClick();
+            if (e.shiftKey || cell.pipeType !== this.selectedTool) {
                 this.inventory[cell.pipeType]++;
                 cell.type = 'empty';
                 cell.pipeType = null;
                 cell.dir = 0;
+            } else {
+                cell.dir = (cell.dir + 1) % 4;
+                this.clickCount++;
             }
         }
 
@@ -360,7 +335,6 @@ class HydraGame {
 
     toggleFlow() {
         if (this.isFlowing) {
-            // Zurücksetzen
             this.isFlowing = false;
             this.flowAnimationProgress = 0;
             clearInterval(this.animationTimer);
@@ -368,21 +342,20 @@ class HydraGame {
             this.clearFlows();
             this.draw();
         } else {
-            // Starten
             this.isFlowing = true;
             this.audio.playFlowStart();
             document.getElementById('flow-btn').innerText = "Stoppen";
             this.simulateFlows();
             
             this.animationTimer = setInterval(() => {
-                this.flowAnimationProgress += 4;
+                this.flowAnimationProgress += 5;
                 if (this.flowAnimationProgress >= 100) {
                     this.flowAnimationProgress = 100;
                     clearInterval(this.animationTimer);
                     this.checkWinCondition();
                 }
                 this.draw();
-            }, 20);
+            }, 25);
         }
     }
 
@@ -396,13 +369,20 @@ class HydraGame {
 
     simulateFlows() {
         this.clearFlows();
-        
         let queue = [];
-        // Richtungs-Vektoren: 0: Oben, 1: Rechts, 2: Unten, 3: Links
         const dx = [0, 1, 0, -1];
         const dy = [-1, 0, 1, 0];
 
-        // Alle Quellen speisen das System ein
+        // 1. Finde alle Portale auf dem Feld für Teleportation
+        let portalsOnBoard = [];
+        for(let x=0; x<this.levelData.gridSize.cols; x++) {
+            for(let y=0; y<this.levelData.gridSize.rows; y++) {
+                if(this.grid[x][y].type === 'pipe' && this.grid[x][y].pipeType === 'portals') {
+                    portalsOnBoard.push({x, y});
+                }
+            }
+        }
+
         this.levelData.sources.forEach(s => {
             for (let d = 0; d < 4; d++) {
                 queue.push({ x: s.x + dx[d], y: s.y + dy[d], incomingDir: (d + 2) % 4, color: s.color });
@@ -410,7 +390,7 @@ class HydraGame {
         });
 
         let iterations = 0;
-        while (queue.length > 0 && iterations < 1000) {
+        while (queue.length > 0 && iterations < 2000) {
             iterations++;
             let current = queue.shift();
             let x = current.x;
@@ -423,11 +403,9 @@ class HydraGame {
                 let outDirs = [];
                 let inDir = current.incomingDir;
                 let cType = cell.pipeType;
-                let rot = cell.dir; // 0, 1, 2, 3
+                let rot = cell.dir;
 
-                // Überprüfe ob Rohr auf dieser Seite offen ist
                 if (cType === 'pipes_straight') {
-                    // 0 oder 2: Vertikal (offen Oben/Unten), 1 oder 3: Horizontal (offen Links/Rechts)
                     let isOpen = (rot % 2 === 0) ? (inDir === 0 || inDir === 2) : (inDir === 1 || inDir === 3);
                     if (isOpen && !cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
@@ -436,12 +414,10 @@ class HydraGame {
                         outDirs.push(outDir);
                     }
                 } else if (cType === 'pipes_angle') {
-                    // Basis-Form (rot=0): Verbindet Oben (0) und Rechts (1)
                     let localizedIn = (inDir - rot + 4) % 4;
                     if ((localizedIn === 0 || localizedIn === 1) && !cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
-                        let localizedOut = (localizedIn === 0) ? 1 : 0;
-                        let outDir = (localizedOut + rot) % 4;
+                        let outDir = ((localizedIn === 0 ? 1 : 0) + rot) % 4;
                         cell.flows[outDir] = current.color;
                         outDirs.push(outDir);
                     }
@@ -453,40 +429,65 @@ class HydraGame {
                         outDirs.push(outDir);
                     }
                 } else if (cType === 'mixers') {
-                    // Nimmt von den Seiten auf und mischt nach vorne (rot)
-                    let backSide = (rot + 2) % 4;
                     if (inDir !== rot && !cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
-                        
-                        // Finde alle eintreffenden Farben für den Mixer
-                        let colors = Object.values(cell.flows);
-                        let mixedColor = this.mixColors(colors);
-                        cell.flows[rot] = mixedColor;
+                        let mixed = this.mixColors(Object.values(cell.flows));
+                        cell.flows[rot] = mixed;
                         outDirs.push(rot);
                     }
                 } else if (cType === 'splitters') {
-                    // Nimmt von hinten (rot+2) auf und splittet nach links/rechts/vorne auf
                     let backSide = (rot + 2) % 4;
                     if (inDir === backSide && !cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
-                        let split = this.splitColor(current.color);
-                        
+                        let splits = this.splitColor(current.color);
                         let leftDir = (rot + 3) % 4;
                         let rightDir = (rot + 1) % 4;
-                        
-                        cell.flows[leftDir] = split[0];
-                        cell.flows[rightDir] = split[1] || split[0];
-                        cell.flows[rot] = current.color;
+                        cell.flows[leftDir] = splits[0];
+                        cell.flows[rightDir] = splits[1] || splits[0];
+                        outDirs.push(leftDir, rightDir);
+                    }
+                } else if (cType === 'valves') {
+                    let mainInput = (rot + 2) % 4;
+                    let sideLeft = (rot + 3) % 4;
+                    let sideRight = (rot + 1) % 4;
 
-                        outDirs.push(leftDir, rightDir, rot);
+                    if (!cell.flows[inDir]) {
+                        cell.flows[inDir] = current.color;
+                    }
+
+                    // Prüfe ob Druck von der Seite anliegt
+                    let hasPressure = cell.flows[sideLeft] || cell.flows[sideRight];
+                    if (hasPressure && cell.flows[mainInput]) {
+                        cell.flows[rot] = cell.flows[mainInput];
+                        outDirs.push(rot);
+                    }
+                } else if (cType === 'andGates') {
+                    if (!cell.flows[inDir]) {
+                        cell.flows[inDir] = current.color;
+                    }
+                    let activeInputs = Object.keys(cell.flows).filter(d => d !== rot.toString());
+                    if (activeInputs.length >= 2) {
+                        cell.flows[rot] = current.color; 
+                        outDirs.push(rot);
+                    }
+                } else if (cType === 'portals') {
+                    if (!cell.flows[inDir]) {
+                        cell.flows[inDir] = current.color;
+                        // Finde anderes Portal und leite weiter
+                        let other = portalsOnBoard.find(p => p.x !== x || p.y !== y);
+                        if (other) {
+                            let otherCell = this.grid[other.x][other.y];
+                            otherCell.flows[inDir] = current.color;
+                            for(let d=0; d<4; d++) {
+                                queue.push({ x: other.x + dx[d], y: other.y + dy[d], incomingDir: (d + 2) % 4, color: current.color });
+                            }
+                        }
                     }
                 }
 
-                // Schiebe Output-Ströme in die Queue weiter
                 outDirs.forEach(d => {
                     queue.push({ x: x + dx[d], y: y + dy[d], incomingDir: (d + 2) % 4, color: cell.flows[d] });
                 });
-
             } else if (cell.type === 'target') {
                 if (!cell.flows[current.incomingDir]) {
                     cell.flows[current.incomingDir] = current.color;
@@ -511,12 +512,10 @@ class HydraGame {
 
     checkWinCondition() {
         let allMatched = true;
-
         this.levelData.targets.forEach(t => {
             let cell = this.grid[t.x][t.y];
             let values = Object.values(cell.flows);
-            let hasMatch = values.some(c => c === t.requiredColor);
-            if (!hasMatch) allMatched = false;
+            if (!values.includes(t.requiredColor)) allMatched = false;
         });
 
         if (allMatched && this.levelData.targets.length > 0) {
@@ -526,30 +525,23 @@ class HydraGame {
 
     handleWin() {
         this.audio.playWin();
-
-        // Berechne Sterne basierend auf der Effizienz
         let stars = 1;
         if (this.clickCount <= this.levelData.parClicks) stars = 3;
-        else if (this.clickCount <= this.levelData.parClicks + 3) stars = 2;
+        else if (this.clickCount <= this.levelData.parClicks + 2) stars = 2;
 
         let key = `${this.currentChapter}_${this.currentLevelIndex}`;
         let previousStars = this.solvedLevels[key] || 0;
 
         if (stars > previousStars) {
             this.solvedLevels[key] = stars;
-            let xpGained = this.levelData.xpReward || 100;
-            this.totalXP += xpGained;
+            this.totalXP += this.levelData.xpReward || 100;
             localStorage.setItem('hydra_xp', this.totalXP);
             localStorage.setItem('hydra_solved', JSON.stringify(this.solvedLevels));
         }
 
-        // Win Modal konfigurieren
         document.getElementById('win-xp-reward').innerText = `+${this.levelData.xpReward || 100} XP`;
         const container = document.getElementById('win-stars-container');
-        container.innerHTML = '';
-        for (let i = 0; i < 3; i++) {
-            container.innerHTML += i < stars ? '<span class="text-yellow-400">⭐</span>' : '<span class="text-zinc-700">⭐</span>';
-        }
+        container.innerHTML = '⭐'.repeat(stars) + ' Klaus '.substring(0,0); // Native String injection safe
 
         this.updateTopBar();
         document.getElementById('modal-win').classList.remove('hidden');
@@ -565,7 +557,7 @@ class HydraGame {
     }
 
     resetLevel() {
-        if (this.levelData) this.startLevel(this.currentChapter, this.currentLevelIndex);
+        this.startLevel(this.currentChapter, this.currentLevelIndex);
     }
 
     returnToMenu() {
@@ -586,7 +578,7 @@ class HydraGame {
     }
 
     resetAllData() {
-        if (confirm("Möchtest du wirklich alle Spieldaten unwiderruflich löschen?")) {
+        if (confirm("Fortschritt wirklich restlos löschen?")) {
             localStorage.clear();
             this.totalXP = 0;
             this.solvedLevels = {};
@@ -597,24 +589,27 @@ class HydraGame {
         }
     }
 
+    drawCB(x, y, color) {
+        // Hilfsfunktion für Spezialeffekte im Canvas aus v13.4
+        this.ctx.save();
+        this.ctx.shadowBlur = 8;
+        this.ctx.shadowColor = this.colorMap[color];
+        this.ctx.fillStyle = this.colorMap[color];
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+
     draw() {
         if (!this.levelData) return;
-        
         const cols = this.levelData.gridSize.cols;
         const rows = this.levelData.gridSize.rows;
-        const s = this.canvas.width / cols; // Cell Size
+        const s = this.canvas.width / cols;
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Grid Linien im Hintergrund zeichnen
-        this.ctx.strokeStyle = '#18181b';
-        this.ctx.lineWidth = 1;
-        for (let i = 0; i <= cols; i++) {
-            this.ctx.beginPath(); this.ctx.moveTo(i * s, 0); this.ctx.lineTo(i * s, this.canvas.height); this.ctx.stroke();
-            this.ctx.beginPath(); this.ctx.moveTo(0, i * s); this.ctx.lineTo(this.canvas.width, i * s); this.ctx.stroke();
-        }
-
-        // Zellen rendern
+        // Zellstrukturen rendern
         for (let x = 0; x < cols; x++) {
             for (let y = 0; y < rows; y++) {
                 const cell = this.grid[x][y];
@@ -625,78 +620,59 @@ class HydraGame {
                 this.ctx.translate(cx, cy);
 
                 if (cell.type === 'wall') {
-                    this.ctx.fillStyle = '#27272a';
+                    this.ctx.fillStyle = '#1c1c1e';
                     this.ctx.fillRect(-s/2 + 2, -s/2 + 2, s - 4, s - 4);
                 } else if (cell.type === 'source') {
                     let col = this.colorMap[cell.color];
-                    this.ctx.shadowBlur = 15; this.ctx.shadowColor = col;
                     this.ctx.fillStyle = col;
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s * 0.28, 0, Math.PI * 2); this.ctx.fill();
-                    
-                    this.ctx.strokeStyle = '#ffffff'; this.ctx.lineWidth = 2;
-                    this.ctx.beginPath(); this.ctx.arc(0, 0, s * 0.14, 0, Math.PI * 2); this.ctx.stroke();
+                    this.ctx.beginPath(); this.ctx.arc(0, 0, s * 0.3, 0, Math.PI * 2); this.ctx.fill();
                 } else if (cell.type === 'target') {
                     let col = this.colorMap[cell.requiredColor];
                     this.ctx.strokeStyle = col; this.ctx.lineWidth = 3;
                     this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
-
-                    // Signalisiert einen aktiven, korrekten Durchfluss am Ziel
-                    if (Object.keys(cell.flows).length > 0) {
-                        this.ctx.fillStyle = col;
-                        this.ctx.globalAlpha = 0.4;
-                        this.ctx.fillRect(-s/3, -s/3, s*2/3, s*2/3);
-                    }
                 } else if (cell.type === 'pipe') {
                     this.ctx.rotate(cell.dir * Math.PI / 2);
-                    this.ctx.strokeStyle = '#52525b';
-                    this.ctx.lineWidth = s * 0.22;
+                    this.ctx.strokeStyle = '#3f3f46';
+                    this.ctx.lineWidth = s * 0.25;
                     this.ctx.lineCap = 'round';
 
                     let isFlowing = this.isFlowing && Object.keys(cell.flows).length > 0;
                     let flowColors = Object.values(cell.flows);
 
                     if (cell.pipeType === 'pipes_straight') {
-                        // Statische Linie
                         this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                        // Flüssigkeits-Fluss
                         if (isFlowing) {
-                            this.ctx.strokeStyle = this.colorMap[flowColors[0]] || '#fff';
-                            this.ctx.lineWidth = s * 0.12;
+                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
+                            this.ctx.lineWidth = s * 0.14;
                             this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
                         }
                     } else if (cell.pipeType === 'pipes_angle') {
                         this.ctx.beginPath(); this.ctx.arc(-s/2, -s/2, s/2, 0, Math.PI / 2); this.ctx.stroke();
                         if (isFlowing) {
-                            this.ctx.strokeStyle = this.colorMap[flowColors[0]] || '#fff';
-                            this.ctx.lineWidth = s * 0.12;
+                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
+                            this.ctx.lineWidth = s * 0.14;
                             this.ctx.beginPath(); this.ctx.arc(-s/2, -s/2, s/2, 0, Math.PI / 2); this.ctx.stroke();
                         }
                     } else if (cell.pipeType === 'pipes_cross') {
                         this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
                         this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
                         if (isFlowing) {
-                            this.ctx.lineWidth = s * 0.12;
-                            flowColors.forEach(c => {
-                                this.ctx.strokeStyle = this.colorMap[c];
-                                this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                                this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
-                            });
+                            this.ctx.lineWidth = s * 0.14;
+                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
+                            this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
+                            this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
                         }
-                    } else if (cell.pipeType === 'mixers') {
-                        // T-Stück Gehäuse zeichnen
-                        this.ctx.beginPath(); this.ctx.moveTo(-s/3, s/4); this.ctx.lineTo(s/3, s/4);
-                        this.ctx.lineTo(s/4, -s/4); this.ctx.lineTo(-s/4, -s/4); this.ctx.closePath();
-                        this.ctx.fillStyle = '#3f3f46'; this.ctx.fill(); this.ctx.stroke();
-
-                        if (isFlowing) {
-                            let resCol = cell.flows[cell.dir] || flowColors[0];
-                            this.ctx.fillStyle = this.colorMap[resCol] || '#fff';
-                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.14, 0, Math.PI*2); this.ctx.fill();
+                    } else if (cell.pipeType === 'mixers' || cell.pipeType === 'splitters' || cell.pipeType === 'valves' || cell.pipeType === 'andGates' || cell.pipeType === 'portals') {
+                        // Allzweck-Kombinator-Kompaktgehäuse aus v13.4
+                        this.ctx.fillStyle = '#27272a';
+                        this.ctx.fillRect(-s/3, -s/3, s*2/3, s*2/3);
+                        this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
+                        
+                        if(isFlowing) {
+                            this.ctx.fillStyle = this.colorMap[flowColors[0]];
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.15, 0, Math.PI*2); this.ctx.fill();
+                            this.drawCB(0, 0, flowColors[0]);
                         }
-                    } else if (cell.pipeType === 'splitters') {
-                        // Dreieck für Splitter
-                        this.ctx.beginPath(); this.ctx.moveTo(0, -s/3); this.ctx.lineTo(s/3, s/3); this.ctx.lineTo(-s/3, s/3); this.ctx.closePath();
-                        this.ctx.fillStyle = '#71717a'; this.ctx.fill(); this.ctx.stroke();
                     }
                 }
                 this.ctx.restore();
@@ -705,7 +681,17 @@ class HydraGame {
     }
 }
 
-// Initialisierung bei App-Start
 window.addEventListener('DOMContentLoaded', () => {
     window.gameInstance = new HydraGame();
+    
+    const menuBtn = document.getElementById('menu-btn');
+    if(menuBtn) {
+        menuBtn.addEventListener('click', () => {
+            window.gameInstance.returnToMenu();
+        });
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+    }
 });
