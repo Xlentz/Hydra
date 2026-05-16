@@ -47,7 +47,7 @@ class HydraGame {
     constructor() {
         this.audio = new AudioEngine();
         
-        // Neue Kapitel-Konfiguration verknüpfen
+        // Neue kapitelbasierte Gliederung registrieren
         this.chapters = {
             tutorial: { id: 'tutorial', title: '1. Tutorial', levels: typeof LEVELS_TUTORIAL !== 'undefined' ? LEVELS_TUTORIAL : [], icon: '📖', desc: 'Grundlagen & Element-Mechaniken' },
             standard: { id: 'standard', title: '2. Standard', levels: typeof LEVELS_STANDARD !== 'undefined' ? LEVELS_STANDARD : [], icon: '🔧', desc: 'Geraden & Bögen stetig schwerer' },
@@ -60,6 +60,10 @@ class HydraGame {
         this.currentChapter = null;
         this.currentLevelIndex = 0;
         this.levelData = null;
+        
+        // Emojis für den Profile Avatar-Picker
+        this.availAvatars = ['🕵️', '🤖', '🚀', '🧠', '👾', '🛸', '💻', '🔋', '⚙️', '🛡️', '🧪', '⚡', '👑', '🦾', '💥'];
+        this.selectedAvatar = localStorage.getItem('hydra_avatar') || '🕵️';
         
         // Fortschritt laden
         this.totalXP = parseInt(localStorage.getItem('hydra_xp')) || 0;
@@ -107,6 +111,9 @@ class HydraGame {
 
     updateTopBar() {
         const agentName = localStorage.getItem('hydra_agent_name') || 'Agent-X';
+        this.selectedAvatar = localStorage.getItem('hydra_avatar') || '🕵️';
+        
+        document.getElementById('top-avatar').innerText = this.selectedAvatar;
         document.getElementById('top-agent-name').innerText = agentName;
         document.getElementById('top-xp').innerText = `${this.totalXP} XP`;
         let starCount = Object.values(this.solvedLevels).reduce((a, b) => a + b, 0);
@@ -312,14 +319,14 @@ class HydraGame {
             this.clickCount++;
         } else if (cell.type === 'pipe') {
             this.audio.playClick();
-            if (e.shiftKey || cell.pipeType !== this.selectedTool) {
+            if (cell.pipeType === this.selectedTool) {
+                cell.dir = (cell.dir + 1) % 4;
+                this.clickCount++;
+            } else {
                 this.inventory[cell.pipeType]++;
                 cell.type = 'empty';
                 cell.pipeType = null;
                 cell.dir = 0;
-            } else {
-                cell.dir = (cell.dir + 1) % 4;
-                this.clickCount++;
             }
         }
 
@@ -368,17 +375,15 @@ class HydraGame {
         const dx = [0, 1, 0, -1]; // 0: Oben, 1: Rechts, 2: Unten, 3: Links
         const dy = [-1, 0, 1, 0];
 
-        // 1. Alle Portale auf dem Feld lokalisieren
         let portalsOnBoard = [];
-        for(let x=0; x<this.levelData.gridSize.cols; x++) {
-            for(let y=0; y<this.levelData.gridSize.rows; y++) {
+        for(let x = 0; x < this.levelData.gridSize.cols; x++) {
+            for(let y = 0; y < this.levelData.gridSize.rows; y++) {
                 if(this.grid[x] && this.grid[x][y] && this.grid[x][y].type === 'pipe' && this.grid[x][y].pipeType === 'portals') {
                     portalsOnBoard.push({x, y});
                 }
             }
         }
 
-        // 2. Quellen einspeisen
         this.levelData.sources.forEach(s => {
             for (let d = 0; d < 4; d++) {
                 queue.push({ x: s.x + dx[d], y: s.y + dy[d], incomingDir: (d + 2) % 4, color: s.color });
@@ -471,7 +476,7 @@ class HydraGame {
                             let otherCell = this.grid[other.x][other.y];
                             if(otherCell && !otherCell.flows[inDir]) {
                                 otherCell.flows[inDir] = current.color;
-                                for(let d=0; d<4; d++) {
+                                for(let d = 0; d < 4; d++) {
                                     queue.push({ x: other.x + dx[d], y: other.y + dy[d], incomingDir: (d + 2) % 4, color: current.color });
                                 }
                             }
@@ -570,6 +575,23 @@ class HydraGame {
             nameInput.value = localStorage.getItem('hydra_agent_name') || 'Agent-X';
         }
 
+        // Grid für Emoji Avatar-Picker rendern
+        const pickerGrid = document.getElementById('avatar-picker-grid');
+        if (pickerGrid) {
+            pickerGrid.innerHTML = '';
+            this.availAvatars.forEach(emoji => {
+                const item = document.createElement('button');
+                item.className = `p-2 text-xl rounded-lg text-center transition-all border ${emoji === this.selectedAvatar ? 'bg-cyan-950 border-cyan-500' : 'bg-zinc-900 border-transparent hover:border-zinc-700'}`;
+                item.innerText = emoji;
+                item.addEventListener('click', () => {
+                    this.audio.playClick();
+                    this.selectedAvatar = emoji;
+                    this.showProfile(); // Re-render highlights
+                });
+                pickerGrid.appendChild(item);
+            });
+        }
+
         let rankTitle = "Novize";
         if (this.totalXP > 4000) rankTitle = "Großmeister-Kybernetiker";
         else if (this.totalXP > 1500) rankTitle = "System-Architekt";
@@ -588,6 +610,7 @@ class HydraGame {
         if (nameInput) {
             localStorage.setItem('hydra_agent_name', nameInput.value.trim() || 'Agent-X');
         }
+        localStorage.setItem('hydra_avatar', this.selectedAvatar);
         document.getElementById('modal-profile').classList.add('hidden');
         this.updateTopBar();
     }
@@ -598,6 +621,7 @@ class HydraGame {
             this.totalXP = 0;
             this.solvedLevels = {};
             this.currentChapter = null;
+            this.selectedAvatar = '🕵️';
             this.updateTopBar();
             document.getElementById('modal-profile').classList.add('hidden');
             this.renderLevelList();
@@ -644,6 +668,16 @@ class HydraGame {
                     let col = this.colorMap[cell.requiredColor];
                     this.ctx.strokeStyle = col; this.ctx.lineWidth = 3;
                     this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
+                    
+                    // Der wunderschöne pulsierende Zielknoten-Neon-Glow aus Version 13.4
+                    if(cell.flows && Object.keys(cell.flows).length > 0 && (!this.isFlowing || this.flowAnimationProgress > 30)) {
+                        let c = Object.values(cell.flows)[0];
+                        this.ctx.shadowBlur = 20; this.ctx.shadowColor = this.colorMap[c];
+                        this.ctx.fillStyle = this.colorMap[c];
+                        this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.25, 0, Math.PI*2); this.ctx.fill();
+                        this.ctx.shadowBlur = 0;
+                        this.drawCB(0, 0, c);
+                    }
                 } else if (cell.type === 'pipe') {
                     this.ctx.rotate(cell.dir * Math.PI / 2);
                     this.ctx.strokeStyle = '#3f3f46';
@@ -682,7 +716,7 @@ class HydraGame {
                             }
                         }
                     } else {
-                        // Original-Kombinator Gehäuse aus v13.4
+                        // Original-Kombinator Gehäuse & Symbole aus v13.4
                         this.ctx.fillStyle = '#27272a';
                         this.ctx.fillRect(-s/3, -s/3, s*2/3, s*2/3);
                         this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
@@ -719,7 +753,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const menuBtn = document.getElementById('menu-btn');
     if(menuBtn) {
         menuBtn.addEventListener('click', () => {
-            window.gameInstance.returnToMenu();
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('level-selection').classList.remove('hidden');
+            if(window.gameInstance && window.gameInstance.renderLevelList) {
+                window.gameInstance.renderLevelList();
+            }
         });
     }
 
