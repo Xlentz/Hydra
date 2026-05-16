@@ -23,28 +23,23 @@ class AudioEngine {
         osc.type = 'triangle'; osc.frequency.setValueAtTime(200, this.ctx.currentTime);
         osc.frequency.linearRampToValueAtTime(400, this.ctx.currentTime + 0.5);
         gain.gain.setValueAtTime(0, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        gain.gain.linearRampToValueAtTime(0.3, this.ctx.currentTime + 0.2);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.0);
         osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+        osc.start(); osc.stop(this.ctx.currentTime + 1.0);
     }
 
     playWin() {
         if (!this.enabled || this.ctx.state === 'suspended') return;
-        const now = this.ctx.currentTime;
-        const playNote = (freq, start, duration) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + start);
-            gain.gain.setValueAtTime(0.4, now + start);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + start + duration);
+        const notes = [440, 554, 659, 880];
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+            osc.type = 'sine'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, this.ctx.currentTime + i*0.15);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i*0.15 + 0.5);
             osc.connect(gain); gain.connect(this.ctx.destination);
-            osc.start(now + start); osc.stop(now + start + duration);
-        };
-        playNote(523.25, 0, 0.15);
-        playNote(659.25, 0.12, 0.15);
-        playNote(783.99, 0.24, 0.15);
-        playNote(1046.50, 0.36, 0.4);
+            osc.start(this.ctx.currentTime + i*0.15); osc.stop(this.ctx.currentTime + i*0.15 + 0.5);
+        });
     }
 }
 
@@ -52,7 +47,7 @@ class HydraGame {
     constructor() {
         this.audio = new AudioEngine();
         
-        // Kapitel-Konfiguration verknüpfen
+        // Neue Kapitel-Konfiguration verknüpfen
         this.chapters = {
             tutorial: { id: 'tutorial', title: '1. Tutorial', levels: typeof LEVELS_TUTORIAL !== 'undefined' ? LEVELS_TUTORIAL : [], icon: '📖', desc: 'Grundlagen & Element-Mechaniken' },
             standard: { id: 'standard', title: '2. Standard', levels: typeof LEVELS_STANDARD !== 'undefined' ? LEVELS_STANDARD : [], icon: '🔧', desc: 'Geraden & Bögen stetig schwerer' },
@@ -102,9 +97,7 @@ class HydraGame {
         document.getElementById('btn-close-profile').addEventListener('click', () => {
             document.getElementById('modal-profile').classList.add('hidden');
         });
-        document.getElementById('btn-save-profile').addEventListener('click', () => {
-            document.getElementById('modal-profile').classList.add('hidden');
-        });
+        document.getElementById('btn-save-profile').addEventListener('click', () => this.saveProfile());
         document.getElementById('btn-reset-progress').addEventListener('click', () => this.resetAllData());
         document.getElementById('btn-next-level').addEventListener('click', () => {
             document.getElementById('modal-win').classList.add('hidden');
@@ -113,6 +106,8 @@ class HydraGame {
     }
 
     updateTopBar() {
+        const agentName = localStorage.getItem('hydra_agent_name') || 'Agent-X';
+        document.getElementById('top-agent-name').innerText = agentName;
         document.getElementById('top-xp').innerText = `${this.totalXP} XP`;
         let starCount = Object.values(this.solvedLevels).reduce((a, b) => a + b, 0);
         document.getElementById('top-stars').innerText = starCount;
@@ -173,7 +168,7 @@ class HydraGame {
 
                 let borderStyle = "border-zinc-900 text-zinc-400 hover:border-zinc-700";
                 if (isSolved > 0) borderStyle = "border-emerald-500/40 bg-emerald-950/10 text-emerald-400";
-                else if (index === 0 || this.solvedLevels位 !== undefined || this.solvedLevels[`${this.currentChapter}_${index-1}`]) {
+                else if (index === 0 || this.solvedLevels[`${this.currentChapter}_${index-1}`]) {
                     borderStyle = "border-zinc-800 text-slate-200 hover:border-cyan-500";
                 }
 
@@ -370,19 +365,20 @@ class HydraGame {
     simulateFlows() {
         this.clearFlows();
         let queue = [];
-        const dx = [0, 1, 0, -1];
+        const dx = [0, 1, 0, -1]; // 0: Oben, 1: Rechts, 2: Unten, 3: Links
         const dy = [-1, 0, 1, 0];
 
-        // 1. Finde alle Portale auf dem Feld für Teleportation
+        // 1. Alle Portale auf dem Feld lokalisieren
         let portalsOnBoard = [];
         for(let x=0; x<this.levelData.gridSize.cols; x++) {
             for(let y=0; y<this.levelData.gridSize.rows; y++) {
-                if(this.grid[x][y].type === 'pipe' && this.grid[x][y].pipeType === 'portals') {
+                if(this.grid[x] && this.grid[x][y] && this.grid[x][y].type === 'pipe' && this.grid[x][y].pipeType === 'portals') {
                     portalsOnBoard.push({x, y});
                 }
             }
         }
 
+        // 2. Quellen einspeisen
         this.levelData.sources.forEach(s => {
             for (let d = 0; d < 4; d++) {
                 queue.push({ x: s.x + dx[d], y: s.y + dy[d], incomingDir: (d + 2) % 4, color: s.color });
@@ -390,7 +386,7 @@ class HydraGame {
         });
 
         let iterations = 0;
-        while (queue.length > 0 && iterations < 2000) {
+        while (queue.length > 0 && iterations < 2500) {
             iterations++;
             let current = queue.shift();
             let x = current.x;
@@ -398,6 +394,7 @@ class HydraGame {
             
             if (x < 0 || x >= this.levelData.gridSize.cols || y < 0 || y >= this.levelData.gridSize.rows) continue;
             let cell = this.grid[x][y];
+            if (!cell) continue;
 
             if (cell.type === 'pipe') {
                 let outDirs = [];
@@ -431,7 +428,8 @@ class HydraGame {
                 } else if (cType === 'mixers') {
                     if (inDir !== rot && !cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
-                        let mixed = this.mixColors(Object.values(cell.flows));
+                        let existingColors = Object.keys(cell.flows).filter(d => parseInt(d) !== rot).map(d => cell.flows[d]);
+                        let mixed = this.mixColors(existingColors);
                         cell.flows[rot] = mixed;
                         outDirs.push(rot);
                     }
@@ -451,21 +449,16 @@ class HydraGame {
                     let sideLeft = (rot + 3) % 4;
                     let sideRight = (rot + 1) % 4;
 
-                    if (!cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                    }
+                    if (!cell.flows[inDir]) cell.flows[inDir] = current.color;
 
-                    // Prüfe ob Druck von der Seite anliegt
                     let hasPressure = cell.flows[sideLeft] || cell.flows[sideRight];
                     if (hasPressure && cell.flows[mainInput]) {
                         cell.flows[rot] = cell.flows[mainInput];
                         outDirs.push(rot);
                     }
                 } else if (cType === 'andGates') {
-                    if (!cell.flows[inDir]) {
-                        cell.flows[inDir] = current.color;
-                    }
-                    let activeInputs = Object.keys(cell.flows).filter(d => d !== rot.toString());
+                    if (!cell.flows[inDir]) cell.flows[inDir] = current.color;
+                    let activeInputs = Object.keys(cell.flows).filter(d => parseInt(d) !== rot);
                     if (activeInputs.length >= 2) {
                         cell.flows[rot] = current.color; 
                         outDirs.push(rot);
@@ -473,13 +466,14 @@ class HydraGame {
                 } else if (cType === 'portals') {
                     if (!cell.flows[inDir]) {
                         cell.flows[inDir] = current.color;
-                        // Finde anderes Portal und leite weiter
                         let other = portalsOnBoard.find(p => p.x !== x || p.y !== y);
                         if (other) {
                             let otherCell = this.grid[other.x][other.y];
-                            otherCell.flows[inDir] = current.color;
-                            for(let d=0; d<4; d++) {
-                                queue.push({ x: other.x + dx[d], y: other.y + dy[d], incomingDir: (d + 2) % 4, color: current.color });
+                            if(otherCell && !otherCell.flows[inDir]) {
+                                otherCell.flows[inDir] = current.color;
+                                for(let d=0; d<4; d++) {
+                                    queue.push({ x: other.x + dx[d], y: other.y + dy[d], incomingDir: (d + 2) % 4, color: current.color });
+                                }
                             }
                         }
                     }
@@ -541,7 +535,7 @@ class HydraGame {
 
         document.getElementById('win-xp-reward').innerText = `+${this.levelData.xpReward || 100} XP`;
         const container = document.getElementById('win-stars-container');
-        container.innerHTML = '⭐'.repeat(stars) + ' Klaus '.substring(0,0); // Native String injection safe
+        container.innerHTML = '⭐'.repeat(stars);
 
         this.updateTopBar();
         document.getElementById('modal-win').classList.remove('hidden');
@@ -571,10 +565,31 @@ class HydraGame {
     }
 
     showProfile() {
+        const nameInput = document.getElementById('profile-name-input');
+        if (nameInput) {
+            nameInput.value = localStorage.getItem('hydra_agent_name') || 'Agent-X';
+        }
+
+        let rankTitle = "Novize";
+        if (this.totalXP > 4000) rankTitle = "Großmeister-Kybernetiker";
+        else if (this.totalXP > 1500) rankTitle = "System-Architekt";
+        else if (this.totalXP > 500) rankTitle = "Feld-Techniker";
+        
+        document.getElementById('modal-xp-rank').innerText = rankTitle;
         document.getElementById('modal-xp').innerText = `${this.totalXP} XP`;
+        
         let starCount = Object.values(this.solvedLevels).reduce((a, b) => a + b, 0);
         document.getElementById('modal-stars').innerText = starCount;
         document.getElementById('modal-profile').classList.remove('hidden');
+    }
+
+    saveProfile() {
+        const nameInput = document.getElementById('profile-name-input');
+        if (nameInput) {
+            localStorage.setItem('hydra_agent_name', nameInput.value.trim() || 'Agent-X');
+        }
+        document.getElementById('modal-profile').classList.add('hidden');
+        this.updateTopBar();
     }
 
     resetAllData() {
@@ -590,7 +605,6 @@ class HydraGame {
     }
 
     drawCB(x, y, color) {
-        // Hilfsfunktion für Spezialeffekte im Canvas aus v13.4
         this.ctx.save();
         this.ctx.shadowBlur = 8;
         this.ctx.shadowColor = this.colorMap[color];
@@ -609,10 +623,10 @@ class HydraGame {
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Zellstrukturen rendern
         for (let x = 0; x < cols; x++) {
             for (let y = 0; y < rows; y++) {
                 const cell = this.grid[x][y];
+                if (!cell) continue;
                 const cx = x * s + s / 2;
                 const cy = y * s + s / 2;
 
@@ -658,20 +672,38 @@ class HydraGame {
                         this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
                         if (isFlowing) {
                             this.ctx.lineWidth = s * 0.14;
-                            this.ctx.strokeStyle = this.colorMap[flowColors[0]];
-                            this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
-                            this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
+                            if (cell.flows[0] || cell.flows[2]) {
+                                this.ctx.strokeStyle = this.colorMap[cell.flows[0] || cell.flows[2]];
+                                this.ctx.beginPath(); this.ctx.moveTo(0, -s/2); this.ctx.lineTo(0, s/2); this.ctx.stroke();
+                            }
+                            if (cell.flows[1] || cell.flows[3]) {
+                                this.ctx.strokeStyle = this.colorMap[cell.flows[1] || cell.flows[3]];
+                                this.ctx.beginPath(); this.ctx.moveTo(-s/2, 0); this.ctx.lineTo(s/2, 0); this.ctx.stroke();
+                            }
                         }
-                    } else if (cell.pipeType === 'mixers' || cell.pipeType === 'splitters' || cell.pipeType === 'valves' || cell.pipeType === 'andGates' || cell.pipeType === 'portals') {
-                        // Allzweck-Kombinator-Kompaktgehäuse aus v13.4
+                    } else {
+                        // Original-Kombinator Gehäuse aus v13.4
                         this.ctx.fillStyle = '#27272a';
                         this.ctx.fillRect(-s/3, -s/3, s*2/3, s*2/3);
                         this.ctx.strokeRect(-s/3, -s/3, s*2/3, s*2/3);
                         
-                        if(isFlowing) {
-                            this.ctx.fillStyle = this.colorMap[flowColors[0]];
-                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.15, 0, Math.PI*2); this.ctx.fill();
-                            this.drawCB(0, 0, flowColors[0]);
+                        this.ctx.fillStyle = '#71717a';
+                        this.ctx.font = `bold ${s*0.22}px sans-serif`;
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        let sym = '?';
+                        if (cType === 'mixers') sym = '🧪';
+                        if (cType === 'splitters') sym = '⚗️';
+                        if (cType === 'valves') sym = '🛑';
+                        if (cType === 'andGates') sym = '＆';
+                        if (cType === 'portals') sym = '🌀';
+                        this.ctx.fillText(sym, 0, 0);
+
+                        if(isFlowing && flowColors.length > 0) {
+                            let activeCol = cell.flows[cell.dir] || flowColors[0];
+                            this.ctx.fillStyle = this.colorMap[activeCol];
+                            this.ctx.beginPath(); this.ctx.arc(0, 0, s*0.16, 0, Math.PI*2); this.ctx.fill();
+                            this.drawCB(0, 0, activeCol);
                         }
                     }
                 }
