@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydra-logic-v10';
+const CACHE_NAME = 'hydra-logic-v11';
 const ASSETS = [
   './',
   './index.html',

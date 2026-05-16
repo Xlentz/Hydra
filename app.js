@@ -88,7 +88,7 @@ class HydraGame {
 
     init() {
         this.resize();
-        this.renderLevelList();
+        this.renderChapters();
         this.setupEventListeners();
         requestAnimationFrame((t) => this.gameLoop(t));
         this.updateUI(); 
@@ -235,6 +235,8 @@ class HydraGame {
         for(let i = 0; i < this.currentChapterLevels.length; i++) {
             const level = this.currentChapterLevels[i];
             const btn = document.createElement('button');
+            
+            // To ensure save uniqueness across chapters
             const statKey = `${(this.currentChapterTitle || '1').split('.')[0]}_${level.id}`;
             let stars = this.playerStats.levelStars ? (this.playerStats.levelStars[statKey] || 0) : 0;
             
@@ -248,7 +250,8 @@ class HydraGame {
             }
             
             let isCompleted = stars > 0;
-            btn.className = `h-20 flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
+            
+            btn.className = `aspect-square flex flex-col items-center justify-center rounded-2xl font-black transition-all ${isCompleted ? 'bg-gradient-to-b from-zinc-800 to-zinc-900 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'bg-zinc-900 border border-zinc-800 opacity-70'} hover:scale-105 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:border-cyan-400`;
             btn.innerHTML = `<span class="text-2xl ${isCompleted ? 'text-cyan-300' : 'text-zinc-500'}">${level.id}</span>${starHtml}`;
             btn.onclick = () => this.startLevel(i);
             lGrid.appendChild(btn);
@@ -873,11 +876,12 @@ class HydraGame {
             const xp = this.currentLevel.xpReward;
             
             if (!this.playerStats.levelStars) this.playerStats.levelStars = {};
-            let prevStars = this.playerStats.levelStars[this.currentLevel.id] || 0;
+            const statKey = `${(this.currentChapterTitle || '1').split('.')[0]}_${this.currentLevel.id}`;
+            let prevStars = this.playerStats.levelStars[statKey] || 0;
             
             if (earnedStars > prevStars) {
                 this.playerStats.stars += (earnedStars - prevStars); 
-                this.playerStats.levelStars[this.currentLevel.id] = earnedStars;
+                this.playerStats.levelStars[statKey] = earnedStars;
             }
             
             if (prevStars === 0) {
