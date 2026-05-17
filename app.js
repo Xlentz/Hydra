@@ -394,43 +394,43 @@ class HydraGame {
             }
         };
         
-        
-        const btnNextWin = document.getElementById('btn-next-level-win');
-        if (btnNextWin) {
-            btnNextWin.onclick = () => {
-                document.getElementById('win-overlay').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                let index = this.currentChapterLevels.findIndex(l => l.id === this.currentLevel.id);
-                if(index >= 0 && index < this.currentChapterLevels.length - 1) {
-                    this.startLevel(index + 1);
-                } else {
-                    document.getElementById('game-controls').classList.add('hidden');
-                    document.getElementById('level-selection').classList.remove('hidden');
-                    this.renderLevelList();
+        document.getElementById('btn-next').onclick = () => {
+            document.getElementById('win-overlay').classList.add('hidden');
+            if (this.currentLevel.id < this.currentChapterLevels.length) this.startLevel(this.currentLevel.id);
+            else location.reload();
+        }
+    }
+
+    handleCellClick(x, y) {
+        if (this.isSourceOrTarget(x, y)) return;
+        const cell = this.grid[y][x];
+        const inv = this.currentLevel.inventory;
+
+        if (this.activeTool === 'DELETE') {
+            if (cell && cell.type !== 'WALL') {
+                if(cell.type === 'PIPE_STRAIGHT') inv.pipes_straight++;
+                if(cell.type === 'PIPE_ANGLE') inv.pipes_angle++;
+                if(cell.type === 'PIPE_CROSS') inv.pipes_cross++;
+                if(cell.type === 'AND_GATE') inv.andGates++;
+                if(cell.type === 'MIXER') inv.mixers++;
+                if(cell.type === 'SPLITTER') inv.splitters++;
+                if(cell.type === 'PORTAL') inv.portals++;
+                if(cell.type === 'VALVE') inv.valves++;
+                this.grid[y][x] = null;
+                this.audio.playClick();
+                this.clicks--;
+            }
+        } else {
+            if (cell) {
+                if(['PIPE_STRAIGHT', 'PIPE_ANGLE', 'PIPE_CROSS', 'AND_GATE', 'MIXER', 'SPLITTER', 'VALVE'].includes(cell.type)) {
+                    cell.rotation = (cell.rotation + 1) % 4;
+                    this.audio.playClick();
                 }
-            };
-        }
-        
-        const btnRetryWin = document.getElementById('btn-retry-level-win');
-        if (btnRetryWin) {
-            btnRetryWin.onclick = () => {
-                document.getElementById('win-overlay').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-                let index = this.currentChapterLevels.findIndex(l => l.id === this.currentLevel.id);
-                this.startLevel(index);
-            };
-        }
-        
-        const btnBackWin = document.getElementById('btn-back-to-list-win');
-        if (btnBackWin) {
-            btnBackWin.onclick = () => {
-                document.getElementById('win-overlay').classList.add('hidden');
-                document.getElementById('game-controls').classList.add('hidden');
-                document.getElementById('level-selection').classList.remove('hidden');
-                this.renderLevelList();
-            };
-        }
-inv.pipes_straight--; p = true; }
+            } else {
+                let p = false;
+                let rot = this.getBestRotation(x, y, this.activeTool);
+                
+                if (this.activeTool === 'PIPE_STRAIGHT' && inv.pipes_straight > 0) { this.grid[y][x] = { type: 'PIPE_STRAIGHT', rotation: rot }; inv.pipes_straight--; p = true; }
                 else if (this.activeTool === 'PIPE_ANGLE' && inv.pipes_angle > 0) { this.grid[y][x] = { type: 'PIPE_ANGLE', rotation: rot }; inv.pipes_angle--; p = true; }
                 else if (this.activeTool === 'PIPE_CROSS' && inv.pipes_cross > 0) { this.grid[y][x] = { type: 'PIPE_CROSS', rotation: 0 }; inv.pipes_cross--; p = true; }
                 else if (this.activeTool === 'AND_GATE' && inv.andGates > 0) { this.grid[y][x] = { type: 'AND_GATE', rotation: 0 }; inv.andGates--; p = true; }

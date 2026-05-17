@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hydra-logic-v12';
+const CACHE_NAME = 'hydra-logic-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -13,32 +13,32 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  self.skipWaiting(); // Force activate immediately
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.map(key => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      })
+      keys.map(key => caches.delete(key)) // ALWAYS clear old caches immediately on activate
     ))
   );
-  self.clients.claim();
+  self.clients.claim(); // Take control of all pages immediately
 });
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
+  // Network ONLY for JS and HTML to ensure immediate updates during dev
+  if (event.request.url.includes('.js') || event.request.url.includes('.html')) {
+      event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request))
+      );
+      return;
+  }
+  
+  // Network first for other assets
   event.respondWith(
     fetch(event.request)
       .then(networkResponse => {
-        if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
-          return networkResponse;
-        }
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, responseToCache);
